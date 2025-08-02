@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<robot name="kai01_robot" xmlns:xacro="http://ros.org/wiki/xacro">
+  <xacro:arg name="prefix" default="" />
+
+  <!--机器人模型 -->
+  <xacro:include filename="$(find kai01_description)/urdf/materials.xacro"/>  <!-- 模型颜色属性 -->
+  <xacro:include filename="$(find kai01_description)/urdf/inertial_matrix.xacro" />  <!-- 惯性矩阵 -->
+  <xacro:include filename="$(find kai01_description)/urdf/car_mecanum.urdf.xacro"/> <!-- 底盘 -->
+  <xacro:include filename="$(find kai01_description)/urdf/arm.urdf.xacro"/><!-- 机械臂 -->
+
+  <!-- 硬件接口 -->
+  <xacro:include filename="$(find kai01_description)/ros2_control/kai01.ros2_control.xacro"/><!-- 硬件接口描述 -->
+  <xacro:kai01_interface 
+    name= "KAI01_INTERFACE"
+    prefix="$(arg prefix)" />
+
+
+<!-- 机械臂底座连接关节 -->
+  <joint
+    name="arm_joint1"
+    type="revolute">
+    <origin
+      xyz="0.0251328065010765 0 0.0774026880954513"
+      rpy="0 0 0" />
+    <parent
+      link="base_link" />
+    <child
+      link="arm_base_link" />
+    <axis
+      xyz="0 0 -1" />
+    <limit
+      lower="-2.09"
+      upper="2.09"
+      effort="1000"
+      velocity="10" />
+  </joint>    
+</robot>
+
+
