@@ -6,6 +6,7 @@
     <ros2_control name="${name}" type="system">
       <hardware>
         <plugin>mock_components/GenericSystem</plugin> <!-- 使用虚拟组件快速测试 -->
+        <param name="calculate_dynamics">true</param>
       </hardware>
 
       <joint name="${prefix}arm_joint1">  <!-- 机械臂第1旋转关节 -->
@@ -68,16 +69,6 @@
         </state_interface>
       </joint>
 
-      <joint name="${prefix}arm_joint6">   <!-- 机械臂第6旋转关节 -->
-        <command_interface name="position">
-          <param name="min">-2.09</param>
-          <param name="max">2.09</param>
-        </command_interface>
-        <state_interface name="position">
-          <param name="initial_value">0.0</param>
-        </state_interface>
-      </joint>
-
 
       <joint name="${prefix}wheel_left_front_joint">   <!-- 左前轮 -->
         <command_interface name="velocity">
@@ -87,6 +78,7 @@
         <state_interface name="velocity">
           <param name="initial_value">0.0</param>
         </state_interface>
+        <state_interface name="position"/>
       </joint>
 
       <joint name="${prefix}wheel_left_back_joint">   <!-- 左后轮 -->
@@ -97,6 +89,7 @@
         <state_interface name="velocity">
           <param name="initial_value">0.0</param>
         </state_interface>
+        <state_interface name="position"/>
       </joint>
 
       <joint name="${prefix}wheel_right_front_joint">   <!-- 右前轮 -->
@@ -107,6 +100,7 @@
         <state_interface name="velocity">
           <param name="initial_value">0.0</param>
         </state_interface>
+        <state_interface name="position"/>
       </joint>
 
       <joint name="${prefix}wheel_right_back_joint">   <!-- 右后轮 -->
@@ -117,16 +111,8 @@
         <state_interface name="velocity">
           <param name="initial_value">0.0</param>
         </state_interface>
+        <state_interface name="position"/>
       </joint>
-
-      <sensor name="${prefix}imu">   <!-- imu -->
-        <state_interface name="accel_x"/>  <!-- x轴加速度 -->
-        <state_interface name="accel_y"/>  <!-- y轴加速度 -->
-        <state_interface name="accel_y"/>  <!-- z轴加速度-->
-        <state_interface name="gyro_x"/>  <!--  x轴角速度 -->
-        <state_interface name="gyro_y"/>  <!--  y轴角速度 -->
-        <state_interface name="gyro_z"/>  <!--  z轴角速度-->
-      </sensor>
 
 
     </ros2_control>
@@ -134,3 +120,4 @@
   </xacro:macro>
 
 </robot>
+

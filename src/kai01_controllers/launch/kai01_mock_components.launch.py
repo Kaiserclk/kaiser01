@@ -11,6 +11,7 @@ from launch_ros.substitutions import FindPackageShare
 def generate_launch_description():
     # Declare arguments
     declared_arguments = []
+
     declared_arguments.append(
         DeclareLaunchArgument(
             "gui",
@@ -33,9 +34,10 @@ def generate_launch_description():
                     "urdf",
                     "kai01.urdf.xacro",
                 ]
-            ),
+            )
         ]
     )
+
     robot_description = {"robot_description": robot_description_content}
 
     robot_controllers = PathJoinSubstitution(
@@ -46,7 +48,7 @@ def generate_launch_description():
         ]
     )
     rviz_config_file = PathJoinSubstitution(
-        [FindPackageShare("kai01_description"), "/rviz", "display.rviz"]
+        [FindPackageShare("kai01_description"), "rviz", "display.rviz"]
     )
 
     control_node = Node(
@@ -54,13 +56,18 @@ def generate_launch_description():
         executable="ros2_control_node",
         parameters=[robot_controllers],
         output="both",
+        remappings=[
+            ("~/robot_description", "/robot_description"),
+        ],
     )
+
     robot_state_pub_node = Node(
         package="robot_state_publisher",
         executable="robot_state_publisher",
         output="both",
         parameters=[robot_description],
     )
+
     rviz_node = Node(
         package="rviz2",
         executable="rviz2",
@@ -73,14 +80,19 @@ def generate_launch_description():
     joint_state_broadcaster_spawner = Node(
         package="controller_manager",
         executable="spawner",
-        arguments=["joint_state_broadcaster"],
+        arguments=["joint_state_broadcaster", "--controller-manager", "/controller_manager"],
     )
 
-    # robot_controller_spawner = Node(
-    #     package="controller_manager",
-    #     executable="spawner",
-    #     arguments=["forward_position_controller", "--param-file", robot_controllers],
-    # )
+    robot_controller_spawner = Node(
+        package="controller_manager",
+        executable="spawner",
+        arguments=["forward_position_controller", "--controller-manager", "/controller_manager"],
+    )
+    mecanum_drive_controller_spawner = Node(
+        package="controller_manager",
+        executable="spawner",
+        arguments=["mecanum_drive_controller", "--controller-manager", "/controller_manager"],
+    )
 
     # Delay rviz start after `joint_state_broadcaster`
     delay_rviz_after_joint_state_broadcaster_spawner = RegisterEventHandler(
@@ -94,7 +106,7 @@ def generate_launch_description():
     # TODO(anyone): This is a workaround for flaky tests. Remove when fixed.
     delay_joint_state_broadcaster_after_robot_controller_spawner = RegisterEventHandler(
         event_handler=OnProcessExit(
-            target_action=robot_state_pub_node,
+            target_action=robot_controller_spawner,
             on_exit=[joint_state_broadcaster_spawner],
         )
     )
@@ -102,8 +114,10 @@ def generate_launch_description():
     nodes = [
         control_node,
         robot_state_pub_node,
+        robot_controller_spawner,
+        mecanum_drive_controller_spawner,
         delay_rviz_after_joint_state_broadcaster_spawner,
-        delay_joint_state_broadcaster_after_robot_controller_spawner,
+        delay_joint_state_broadcaster_after_robot_controller_spawner
     ]
 
     return LaunchDescription(declared_arguments + nodes)
