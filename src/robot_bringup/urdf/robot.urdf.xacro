@@ -1,0 +1,174 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="mecanum_arm_robot">
+
+  <!-- Minimal URDF for ros2_control interface declarations.
+       This is NOT a full geometric robot description - just enough
+       for controller_manager to load the hardware plugin and controllers. -->
+
+  <!-- Base link -->
+  <link name="base_link">
+    <visual>
+      <geometry><box size="0.3 0.25 0.1"/></geometry>
+    </visual>
+  </link>
+
+  <link name="base_footprint"/>
+  <joint name="base_footprint_joint" type="fixed">
+    <parent link="base_footprint"/>
+    <child link="base_link"/>
+    <origin xyz="0 0 0.05" rpy="0 0 0"/>
+  </joint>
+
+  <!-- IMU link -->
+  <link name="imu_link"/>
+  <joint name="imu_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="imu_link"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </joint>
+
+  <!-- ========== Wheel links and joints ========== -->
+  <xacro:macro name="wheel" params="name x y">
+    <link name="${name}_link">
+      <visual>
+        <geometry><cylinder radius="0.0485" length="0.04"/></geometry>
+        <origin xyz="0 0 0" rpy="1.5708 0 0"/>
+      </visual>
+    </link>
+    <joint name="${name}_joint" type="continuous">
+      <parent link="base_link"/>
+      <child link="${name}_link"/>
+      <origin xyz="${x} ${y} -0.0015" rpy="0 0 0"/>
+      <axis xyz="0 1 0"/>
+    </joint>
+  </xacro:macro>
+
+  <xacro:wheel name="front_left_wheel"  x="0.108"  y="0.0975"/>
+  <xacro:wheel name="front_right_wheel" x="0.108"  y="-0.0975"/>
+  <xacro:wheel name="rear_right_wheel"  x="-0.108" y="-0.0975"/>
+  <xacro:wheel name="rear_left_wheel"   x="-0.108" y="0.0975"/>
+
+  <!-- ========== Arm links and joints ========== -->
+  <xacro:macro name="arm_joint" params="name parent child">
+    <link name="${child}"/>
+    <joint name="${name}" type="revolute">
+      <parent link="${parent}"/>
+      <child link="${child}"/>
+      <origin xyz="0 0 0.05" rpy="0 0 0"/>
+      <axis xyz="0 0 1"/>
+      <limit lower="0" upper="4.18879" effort="10" velocity="5.0"/>
+    </joint>
+  </xacro:macro>
+
+  <xacro:arm_joint name="arm_joint_1" parent="base_link"   child="arm_link_1"/>
+  <xacro:arm_joint name="arm_joint_2" parent="arm_link_1"  child="arm_link_2"/>
+  <xacro:arm_joint name="arm_joint_3" parent="arm_link_2"  child="arm_link_3"/>
+  <xacro:arm_joint name="arm_joint_4" parent="arm_link_3"  child="arm_link_4"/>
+  <xacro:arm_joint name="arm_joint_5" parent="arm_link_4"  child="arm_link_5"/>
+  <xacro:arm_joint name="arm_joint_6" parent="arm_link_5"  child="arm_link_6"/>
+
+  <!-- ========== ros2_control hardware interface ========== -->
+  <ros2_control name="RobotBoardSystem" type="system">
+    <hardware>
+      <plugin>robot_board_hardware/RobotBoardSystemInterface</plugin>
+      <param name="serial_port">/dev/ttyACM0</param>
+      <param name="baud_rate">1000000</param>
+    </hardware>
+
+    <!-- 4 Mecanum wheel motors: velocity command/state -->
+    <joint name="front_left_wheel_joint">
+      <command_interface name="velocity"/>
+      <state_interface name="velocity"/>
+      <param name="motor_id">1</param>
+    </joint>
+    <joint name="front_right_wheel_joint">
+      <command_interface name="velocity"/>
+      <state_interface name="velocity"/>
+      <param name="motor_id">2</param>
+    </joint>
+    <joint name="rear_right_wheel_joint">
+      <command_interface name="velocity"/>
+      <state_interface name="velocity"/>
+      <param name="motor_id">3</param>
+    </joint>
+    <joint name="rear_left_wheel_joint">
+      <command_interface name="velocity"/>
+      <state_interface name="velocity"/>
+      <param name="motor_id">4</param>
+    </joint>
+
+    <!-- 6 Bus servos for robot arm: position command/state (radians) -->
+    <joint name="arm_joint_1">
+      <command_interface name="position"/>
+      <state_interface name="position"/>
+      <param name="servo_id">1</param>
+    </joint>
+    <joint name="arm_joint_2">
+      <command_interface name="position"/>
+      <state_interface name="position"/>
+      <param name="servo_id">2</param>
+    </joint>
+    <joint name="arm_joint_3">
+      <command_interface name="position"/>
+      <state_interface name="position"/>
+      <param name="servo_id">3</param>
+    </joint>
+    <joint name="arm_joint_4">
+      <command_interface name="position"/>
+      <state_interface name="position"/>
+      <param name="servo_id">4</param>
+    </joint>
+    <joint name="arm_joint_5">
+      <command_interface name="position"/>
+      <state_interface name="position"/>
+      <param name="servo_id">5</param>
+    </joint>
+    <joint name="arm_joint_6">
+      <command_interface name="position"/>
+      <state_interface name="position"/>
+      <param name="servo_id">6</param>
+    </joint>
+
+    <!-- IMU sensor -->
+    <sensor name="imu_sensor">
+      <state_interface name="orientation.x"/>
+      <state_interface name="orientation.y"/>
+      <state_interface name="orientation.z"/>
+      <state_interface name="orientation.w"/>
+      <state_interface name="angular_velocity.x"/>
+      <state_interface name="angular_velocity.y"/>
+      <state_interface name="angular_velocity.z"/>
+      <state_interface name="linear_acceleration.x"/>
+      <state_interface name="linear_acceleration.y"/>
+      <state_interface name="linear_acceleration.z"/>
+    </sensor>
+
+    <!-- Battery voltage sensor -->
+    <sensor name="battery_sensor">
+      <state_interface name="voltage"/>
+    </sensor>
+
+    <!-- Button sensor -->
+    <sensor name="button_sensor">
+      <state_interface name="button1_state"/>
+      <state_interface name="button2_state"/>
+    </sensor>
+
+    <!-- LED GPIO -->
+    <gpio name="led">
+      <command_interface name="on_time"/>
+      <command_interface name="off_time"/>
+      <command_interface name="repeat"/>
+      <command_interface name="led_id"/>
+    </gpio>
+
+    <!-- Buzzer GPIO -->
+    <gpio name="buzzer">
+      <command_interface name="frequency"/>
+      <command_interface name="on_time"/>
+      <command_interface name="off_time"/>
+      <command_interface name="repeat"/>
+    </gpio>
+  </ros2_control>
+
+</robot>

@@ -1,0 +1,10 @@
+<library path="robot_board_hardware">
+  <class name="robot_board_hardware/RobotBoardSystemInterface"
+         type="robot_board_hardware::RobotBoardSystemInterface"
+         base_class_type="hardware_interface::SystemInterface">
+    <description>
+      Hardware interface for robot board with mecanum wheels, bus servos, IMU, battery, buttons, and GPIO (LED/buzzer).
+      Communicates with STM32 MCU over serial using a custom binary protocol.
+    </description>
+  </class>
+</library>
