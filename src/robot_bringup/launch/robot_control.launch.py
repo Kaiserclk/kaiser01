@@ -47,11 +47,11 @@ def generate_launch_description():
         output='screen',
     )
 
-    # Spawner for mecanum_base_controller
-    mecanum_base_controller_spawner = Node(
+    # Spawner for mecanum_drive_controller
+    mecanum_drive_controller_spawner = Node(
         package='controller_manager',
         executable='spawner',
-        arguments=['mecanum_base_controller', '--controller-manager', '/controller_manager'],
+        arguments=['mecanum_drive_controller', '--controller-manager', '/controller_manager'],
         output='screen',
     )
 
@@ -80,7 +80,7 @@ def generate_launch_description():
                     period=2.0,
                     actions=[
                         joint_state_broadcaster_spawner,
-                        mecanum_base_controller_spawner,
+                        mecanum_drive_controller_spawner,
                         arm_controller_spawner,
                         imu_broadcaster_spawner,
                     ],
@@ -92,5 +92,5 @@ def generate_launch_description():
     return LaunchDescription([
         robot_state_publisher_node,
         controller_manager_node,
-        delayed_spawners,
+        delayed_spawners
     ])

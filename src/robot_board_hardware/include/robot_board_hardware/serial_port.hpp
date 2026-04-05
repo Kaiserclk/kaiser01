@@ -22,24 +22,24 @@ public:
   SerialPort() = default;
   ~SerialPort();
 
-  SerialPort(const SerialPort &) = delete;
-  SerialPort & operator=(const SerialPort &) = delete;
+  SerialPort(const SerialPort &) = delete; // 禁用拷贝构造
+  SerialPort & operator=(const SerialPort &) = delete;// 禁用拷贝赋值
 
-  bool open(const std::string & device, int baudrate);
-  void close();
+  bool open(const std::string & device, int baudrate); // 打开串口
+  void close(); // 关闭串口
 
-  void start_recv_thread();
-  void stop_recv_thread();
+  void start_recv_thread(); // 启动接收线程
+  void stop_recv_thread(); // 停止接收线程
 
-  // Thread-safe send: builds and sends a complete packet
-  bool send_packet(uint8_t function, const std::vector<uint8_t> & data);
+  // Thread-safe send: builds and sends a complete packet 
+  bool send_packet(uint8_t function, const std::vector<uint8_t> & data); 
 
-  // Thread-safe getters for latest received data (non-blocking)
-  std::optional<ImuData> get_latest_imu();
-  std::optional<BatteryData> get_latest_battery();
-  std::optional<ButtonData> get_latest_button();
+  // Thread-safe getters for latest received data (non-blocking) // 线程安全获取最新接收数据（非阻塞）
+  std::optional<ImuData> get_latest_imu(); // 获取最新IMU数据
+  std::optional<BatteryData> get_latest_battery(); // 获取最新电池数据
+  std::optional<ButtonData> get_latest_button(); // 获取最新按钮数据
 
-  // Synchronous request-response for bus servo position (blocking, timeout 1s)
+  // Synchronous request-response for bus servo position (blocking, timeout 1s) // 同步请求响应用于总线伺服位置（阻塞，超时1秒）
   std::optional<int16_t> read_bus_servo_position(uint8_t servo_id);
 
 private:

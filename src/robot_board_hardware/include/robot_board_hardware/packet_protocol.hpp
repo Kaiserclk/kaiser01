@@ -9,7 +9,7 @@
 namespace robot_board_hardware
 {
 
-enum class PacketFunction : uint8_t
+enum class PacketFunction : uint8_t//功能码
 {
   SYS = 0,
   LED = 1,
@@ -26,23 +26,24 @@ enum class PacketFunction : uint8_t
 
 struct ImuData
 {
-  float ax = 0.0f;
-  float ay = 0.0f;
-  float az = 0.0f;
-  float gx = 0.0f;
-  float gy = 0.0f;
-  float gz = 0.0f;
+  float ax = 0.0f;  // X轴加速度
+  float ay = 0.0f;  // Y轴加速度
+  float az = 0.0f;  // Z轴加速度
+  float gx = 0.0f;  // X轴角速度
+  float gy = 0.0f;  // Y轴角速度
+  float gz = 0.0f;  // Z轴角速度
 };
 
 struct BatteryData//电压
 {
   uint16_t voltage_mv = 0;
+  float voltage = 0.0f;
 };
 
 struct ButtonData//按键
 {
-  uint8_t id = 0;
-  uint8_t event = 0;
+  uint8_t id = 0;  // 按键ID
+  uint8_t event = 0;  // 按键事件
 };
 
 class PacketProtocol

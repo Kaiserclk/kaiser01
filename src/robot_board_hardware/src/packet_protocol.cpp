@@ -12,19 +12,25 @@ uint8_t PacketProtocol::checksum_crc8(const uint8_t * data, size_t len)
   return check;
 }
 
-std::vector<uint8_t> PacketProtocol::build_packet(
+/**
+ * @brief Build a packet with the given function code and data.
+ *
+ * @param function The function code.
+ * @param data The data to be sent.
+ * @return std::vector<uint8_t> The built packet.
+ */
+std::vector<uint8_t> PacketProtocol ::build_packet(
   uint8_t function, const std::vector<uint8_t> & data)
 {
   // Format: [0xAA, 0x55, function, length, data..., crc8]
   // CRC8 covers [function, length, data...]
   std::vector<uint8_t> packet;
-  packet.reserve(4 + data.size() + 1);
-  packet.push_back(HEADER_BYTE1);
-  packet.push_back(HEADER_BYTE2);
-  packet.push_back(function);
-  packet.push_back(static_cast<uint8_t>(data.size()));
-  packet.insert(packet.end(), data.begin(), data.end());
-
+  packet.reserve(4 + data.size() + 1);// 预分配容量，避免多次扩容
+  packet.push_back(HEADER_BYTE1);// 第1个字节：帧头1
+  packet.push_back(HEADER_BYTE2);// 第2个字节：帧头2
+  packet.push_back(function);// 第3个字节：功能码
+  packet.push_back(static_cast<uint8_t>(data.size()));// 第4个字节：数据长度
+  packet.insert(packet.end(), data.begin(), data.end());//  插入数据
   // CRC8 over bytes starting from function (index 2) to end of data
   uint8_t crc = checksum_crc8(packet.data() + 2, packet.size() - 2);
   packet.push_back(crc);
@@ -32,31 +38,44 @@ std::vector<uint8_t> PacketProtocol::build_packet(
   return packet;
 }
 
+/**
+ * @brief Build a motor speed command packet.
+ *
+ * @param speeds A vector of pairs containing motor ID and speed.
+ * @return std::vector<uint8_t> The built packet.
+ */
 std::vector<uint8_t> PacketProtocol::build_motor_speed_cmd(
   const std::vector<std::pair<uint8_t, float>> & speeds)
 {
   // Data format: [0x01, count, id0(u8) speed0(f32 LE), id1(u8) speed1(f32 LE), ...]
   // Note: motor ID in packet is 0-based (Python SDK does i[0] - 1)
   std::vector<uint8_t> data;
-  data.push_back(0x01);
-  data.push_back(static_cast<uint8_t>(speeds.size()));
-  for (const auto & [id, speed] : speeds) {
-    data.push_back(id);  // already 0-based
-    append_le<float>(data, speed);
+  data.push_back(0x01);//命令字（设置速度）
+  data.push_back(static_cast<uint8_t>(speeds.size()));//电机数量
+  for (const auto & [id, speed] : speeds) { //结构化绑定，解包 pair
+    data.push_back(id);  // 放入电机 ID（1 字节）
+    append_le<float>(data, speed);// 放入速度（4 字节）
   }
   return data;
 }
 
+/**
+ * @brief Build a bus servo position command packet.
+ *
+ * @param duration_ms The duration for the position change.
+ * @param positions A vector of pairs containing servo ID and position.
+ * @return std::vector<uint8_t> The built packet.
+ */
 std::vector<uint8_t> PacketProtocol::build_bus_servo_position_cmd(
   uint16_t duration_ms,
   const std::vector<std::pair<uint8_t, uint16_t>> & positions)
 {
   // Data format: [0x01, dur_lo, dur_hi, count, id(u8) pos(u16 LE), ...]
   std::vector<uint8_t> data;
-  data.push_back(0x01);
-  data.push_back(static_cast<uint8_t>(duration_ms & 0xFF));
-  data.push_back(static_cast<uint8_t>((duration_ms >> 8) & 0xFF));
-  data.push_back(static_cast<uint8_t>(positions.size()));
+  data.push_back(0x01);//命令字（设置速度）
+  data.push_back(static_cast<uint8_t>(duration_ms & 0xFF));//低字节
+  data.push_back(static_cast<uint8_t>((duration_ms >> 8) & 0xFF));//高字节
+  data.push_back(static_cast<uint8_t>(positions.size()));//控制舵机个数
   for (const auto & [id, pos] : positions) {
     data.push_back(id);
     append_le<uint16_t>(data, pos);
@@ -64,12 +83,26 @@ std::vector<uint8_t> PacketProtocol::build_bus_servo_position_cmd(
   return data;
 }
 
+
+/**
+ * @brief 构建读总线舵机位置命令包
+ *
+ * @param servo_id The ID of the servo to read.
+ * @return std::vector<uint8_t> The built packet.
+ */
 std::vector<uint8_t> PacketProtocol::build_bus_servo_read_position_cmd(uint8_t servo_id)
 {
   // Data format: [0x05, servo_id]
-  return {0x05, servo_id};
+  return {0x05, servo_id};//命令字（读取位置），舵机ID
 }
 
+/**
+ * @brief 构建总线舵机使能扭矩命令包
+ *
+ * @param servo_id The ID of the servo.
+ * @param enable True to enable torque, false to disable.
+ * @return std::vector<uint8_t> The built packet.
+ */
 std::vector<uint8_t> PacketProtocol::build_bus_servo_enable_torque_cmd(
   uint8_t servo_id, bool enable)
 {
@@ -77,6 +110,15 @@ std::vector<uint8_t> PacketProtocol::build_bus_servo_enable_torque_cmd(
   return {static_cast<uint8_t>(enable ? 0x0B : 0x0C), servo_id};
 }
 
+/**
+ * @brief 构建LED控制命令包
+ *
+ * @param led_id The ID of the LED.
+ * @param on_time_ms The on time in milliseconds.
+ * @param off_time_ms The off time in milliseconds.
+ * @param repeat The repeat count.
+ * @return std::vector<uint8_t> The built packet.
+ */
 std::vector<uint8_t> PacketProtocol::build_led_cmd(
   uint8_t led_id, uint16_t on_time_ms, uint16_t off_time_ms, uint16_t repeat)
 {
@@ -89,6 +131,15 @@ std::vector<uint8_t> PacketProtocol::build_led_cmd(
   return data;
 }
 
+/**
+ * @brief 构建蜂鸣器控制命令包
+ *
+ * @param freq The frequency in Hz.
+ * @param on_time_ms The on time in milliseconds.
+ * @param off_time_ms The off time in milliseconds.
+ * @param repeat The repeat count.
+ * @return std::vector<uint8_t> The built packet.
+ */
 std::vector<uint8_t> PacketProtocol::build_buzzer_cmd(
   uint16_t freq, uint16_t on_time_ms, uint16_t off_time_ms, uint16_t repeat)
 {
@@ -101,6 +152,14 @@ std::vector<uint8_t> PacketProtocol::build_buzzer_cmd(
   return data;
 }
 
+/**
+ * @brief 解析IMU数据
+ *
+ * @param data The data to be parsed.
+ * @param out The parsed IMU data.
+ * @return true If parsing is successful.
+ * @return false If parsing fails.
+ */
 bool PacketProtocol::parse_imu(const std::vector<uint8_t> & data, ImuData & out)
 {
   // IMU data: 24 bytes = 6 x float32 LE (ax, ay, az, gx, gy, gz)
@@ -116,6 +175,14 @@ bool PacketProtocol::parse_imu(const std::vector<uint8_t> & data, ImuData & out)
   return true;
 }
 
+/**
+ * @brief 解析电池数据
+ *
+ * @param data The data to be parsed.
+ * @param out The parsed battery data.
+ * @return true If parsing is successful.
+ * @return false If parsing fails.
+ */
 bool PacketProtocol::parse_battery(const std::vector<uint8_t> & data, BatteryData & out)
 {
   // Battery data: [0x04, voltage(u16 LE)]
@@ -123,9 +190,18 @@ bool PacketProtocol::parse_battery(const std::vector<uint8_t> & data, BatteryDat
     return false;
   }
   out.voltage_mv = read_le<uint16_t>(data.data() + 1);
+  out.voltage=out.voltage_mv/1000;
   return true;
 }
 
+/**
+ * @brief 解析按键数据
+ *
+ * @param data The data to be parsed.
+ * @param out The parsed button data.
+ * @return true If parsing is successful.
+ * @return false If parsing fails.
+ */
 bool PacketProtocol::parse_button(const std::vector<uint8_t> & data, ButtonData & out)
 {
   // Button data: [key_id(u8), event(u8)]
@@ -137,6 +213,14 @@ bool PacketProtocol::parse_button(const std::vector<uint8_t> & data, ButtonData 
   return true;
 }
 
+/**
+ * @brief 解析总线舵机位置
+ *
+ * @param data The data to be parsed.
+ * @param position The parsed position.
+ * @return true If parsing is successful.
+ * @return false If parsing fails.
+ */
 bool PacketProtocol::parse_bus_servo_position(
   const std::vector<uint8_t> & data, int16_t & position)
 {

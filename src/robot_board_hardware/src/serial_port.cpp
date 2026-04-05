@@ -63,26 +63,26 @@ bool SerialPort::open(const std::string & device, int baudrate)
   cfsetospeed(&tty, baud);
 
   // 8N1, no parity, no hardware flow control
-  tty.c_cflag &= ~PARENB;
-  tty.c_cflag &= ~CSTOPB;
-  tty.c_cflag &= ~CSIZE;
-  tty.c_cflag |= CS8;
-  tty.c_cflag &= ~CRTSCTS;
-  tty.c_cflag |= CREAD | CLOCAL;
+  tty.c_cflag &= ~PARENB; //禁用奇偶校验
+  tty.c_cflag &= ~CSTOPB; //禁用停止位
+  tty.c_cflag &= ~CSIZE;  //清除数据位掩码
+  tty.c_cflag |= CS8;     //设置数据位为8
+  tty.c_cflag &= ~CRTSCTS; //禁用硬件流控制
+  tty.c_cflag |= CREAD | CLOCAL; //启用接收者，忽略 modem 控制
 
   // Raw input mode
-  tty.c_lflag &= ~(ICANON | ECHO | ECHOE | ISIG);
-  tty.c_iflag &= ~(IXON | IXOFF | IXANY);
-  tty.c_iflag &= ~(IGNBRK | BRKINT | PARMRK | ISTRIP | INLCR | IGNCR | ICRNL);
+  tty.c_lflag &= ~(ICANON | ECHO | ECHOE | ISIG); // 禁用规范模式、回显、信号
+  tty.c_iflag &= ~(IXON | IXOFF | IXANY); //禁用软件流控制
+  tty.c_iflag &= ~(IGNBRK | BRKINT | PARMRK | ISTRIP | INLCR | IGNCR | ICRNL); // 禁用特殊字符处理
 
   // Raw output
-  tty.c_oflag &= ~OPOST;
+  tty.c_oflag &= ~OPOST; // 禁用输出处理
 
   // Read with timeout: VMIN=0, VTIME=1 (100ms timeout)
-  tty.c_cc[VMIN] = 0;
+  tty.c_cc[VMIN] = 0;   // 最少字符数：0（非阻塞）
   tty.c_cc[VTIME] = 1;  // 100ms
 
-  tcflush(fd_, TCIFLUSH);
+  tcflush(fd_, TCIFLUSH);   // 清除输入队列中的旧数据
 
   if (tcsetattr(fd_, TCSANOW, &tty) != 0) {
     ::close(fd_);
@@ -92,10 +92,10 @@ bool SerialPort::open(const std::string & device, int baudrate)
 
   // Disable RTS and DTR (matching Python SDK: rts=False, dtr=False)
   int modem_bits = 0;
-  ioctl(fd_, TIOCMGET, &modem_bits);
-  modem_bits &= ~TIOCM_RTS;
-  modem_bits &= ~TIOCM_DTR;
-  ioctl(fd_, TIOCMSET, &modem_bits);
+  ioctl(fd_, TIOCMGET, &modem_bits); // 获取当前状态
+  modem_bits &= ~TIOCM_RTS; // 清除 RTS
+  modem_bits &= ~TIOCM_DTR;// 清除 DTR
+  ioctl(fd_, TIOCMSET, &modem_bits); // 应用设置
 
   return true;
 }
@@ -108,6 +108,9 @@ void SerialPort::close()
   }
 }
 
+/*
+@brief Start the receive thread
+*/
 void SerialPort::start_recv_thread()
 {
   if (recv_running_) {
@@ -117,6 +120,9 @@ void SerialPort::start_recv_thread()
   recv_thread_ = std::thread(&SerialPort::recv_loop, this);
 }
 
+/*
+@brief Stop the receive thread
+*/
 void SerialPort::stop_recv_thread()
 {
   recv_running_ = false;
@@ -125,6 +131,11 @@ void SerialPort::stop_recv_thread()
   }
 }
 
+/*
+@brief Write raw data to the serial port
+@param data The data to write
+@return True if the data was written successfully, false otherwise
+*/
 bool SerialPort::raw_write(const std::vector<uint8_t> & data)
 {
   if (fd_ < 0) {
@@ -134,6 +145,12 @@ bool SerialPort::raw_write(const std::vector<uint8_t> & data)
   return written == static_cast<ssize_t>(data.size());
 }
 
+/*
+@brief Send a packet with the given function and data
+@param function The function code
+@param data The data to send
+@return True if the packet was sent successfully, false otherwise
+*/
 bool SerialPort::send_packet(uint8_t function, const std::vector<uint8_t> & data)
 {
   auto packet = PacketProtocol::build_packet(function, data);
@@ -141,6 +158,10 @@ bool SerialPort::send_packet(uint8_t function, const std::vector<uint8_t> & data
   return raw_write(packet);
 }
 
+/*
+@brief Get the latest IMU data
+@return The latest IMU data, or std::nullopt if no data is available
+*/
 std::optional<ImuData> SerialPort::get_latest_imu()
 {
   std::lock_guard<std::mutex> lock(imu_mutex_);
@@ -149,6 +170,10 @@ std::optional<ImuData> SerialPort::get_latest_imu()
   return val;
 }
 
+/*
+@brief Get the latest battery data
+@return The latest battery data, or std::nullopt if no data is available
+*/
 std::optional<BatteryData> SerialPort::get_latest_battery()
 {
   std::lock_guard<std::mutex> lock(battery_mutex_);
@@ -157,6 +182,10 @@ std::optional<BatteryData> SerialPort::get_latest_battery()
   return val;
 }
 
+/*
+@brief Get the latest button data
+@return The latest button data, or std::nullopt if no data is available
+*/
 std::optional<ButtonData> SerialPort::get_latest_button()
 {
   std::lock_guard<std::mutex> lock(button_mutex_);
@@ -165,6 +194,11 @@ std::optional<ButtonData> SerialPort::get_latest_button()
   return val;
 }
 
+/*
+@brief 读取指定编号的舵机位置
+@param servo_id The ID of the servo to read
+@return The position of the servo, or std::nullopt if the read failed
+*/
 std::optional<int16_t> SerialPort::read_bus_servo_position(uint8_t servo_id)
 {
   // Only one servo read at a time
@@ -206,6 +240,9 @@ std::optional<int16_t> SerialPort::read_bus_servo_position(uint8_t servo_id)
   return std::nullopt;
 }
 
+/*
+@brief Receive loop to process incoming data
+*/
 void SerialPort::recv_loop()
 {
   RecvState state = RecvState::STARTBYTE1;
@@ -297,6 +334,11 @@ void SerialPort::recv_loop()
   }
 }
 
+/*
+@brief Dispatch a received packet to the appropriate handler
+@param function The function code of the packet
+@param data The data payload of the packet
+*/
 void SerialPort::dispatch_packet(uint8_t function, const std::vector<uint8_t> & data)
 {
   auto func = static_cast<PacketFunction>(function);

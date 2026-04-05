@@ -65,6 +65,12 @@ public:
   hardware_interface::return_type write(
     const rclcpp::Time & time, const rclcpp::Duration & period) override;
 
+  // Get the logger of the SystemInterface
+  rclcpp::Logger get_logger() const { return *logger_; }
+  // Get the clock of the SystemInterface
+  rclcpp::Clock::SharedPtr get_clock() const { return clock_; }
+
+
 private:
   // Serial communication
   std::unique_ptr<SerialPort> serial_port_;
@@ -74,17 +80,17 @@ private:
   // Joint configuration: wheel motor names and IDs
   struct WheelConfig
   {
-    std::string name;
+    std::string name;       // 轮子名称
     uint8_t motor_id = 0;  // 0-based ID for protocol
     bool negate = false;    // true for rear wheels (mounted reversed)
   };
   std::vector<WheelConfig> wheels_;
 
-  // Joint configuration: arm servo names and IDs
+  // 机械臂关节舵机
   struct ServoConfig
   {
-    std::string name;
-    uint8_t servo_id = 0;  // 1-based ID for protocol
+    std::string name;       // 关节
+    uint8_t servo_id = 0;  // 舵机ID
   };
   std::vector<ServoConfig> arm_servos_;
 
@@ -98,7 +104,14 @@ private:
   // State and command storage
   std::unordered_map<std::string, double> hw_states_;
   std::unordered_map<std::string, double> hw_commands_;
+
+
+  std::shared_ptr<rclcpp::Logger> logger_;
+  rclcpp::Clock::SharedPtr clock_;
+
+
 };
+
 
 }  // namespace robot_board_hardware
 
