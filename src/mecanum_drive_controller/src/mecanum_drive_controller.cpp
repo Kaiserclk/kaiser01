@@ -131,13 +131,13 @@ controller_interface::CallbackReturn MecanumDriveController::on_configure(
   if (use_stamped_vel_)
   {
     ref_subscriber_ = get_node()->create_subscription<ControllerReferenceMsg>(
-      "~/reference", subscribers_qos,
+      "~/cmd_velstamped", subscribers_qos,
       std::bind(&MecanumDriveController::reference_callback, this, std::placeholders::_1));
   }
   else
   {
     ref_unstamped_subscriber_ = get_node()->create_subscription<ControllerReferenceMsgUnstamped>(
-      "~/reference_unstamped", subscribers_qos,
+      "~/cmd_vel", subscribers_qos,
       std::bind(
         &MecanumDriveController::reference_unstamped_callback, this, std::placeholders::_1));
   }
@@ -262,6 +262,7 @@ void MecanumDriveController::reference_callback(const std::shared_ptr<Controller
 void MecanumDriveController::reference_unstamped_callback(
   const std::shared_ptr<ControllerReferenceMsgUnstamped> msg)
 {
+  RCLCPP_INFO(get_node()->get_logger(), "Received new reference command");
   // Write fake header in the stored stamped command
   auto twist_stamped = *(input_ref_.readFromNonRT());
   twist_stamped->twist = *msg;
@@ -464,6 +465,12 @@ controller_interface::return_type MecanumDriveController::update_and_write_comma
     command_interfaces_[FRONT_RIGHT].set_value(wheel_front_right_vel);
     command_interfaces_[REAR_RIGHT].set_value(wheel_rear_right_vel);
     command_interfaces_[REAR_LEFT].set_value(wheel_rear_left_vel);
+
+    RCLCPP_INFO_THROTTLE(get_node()->get_logger(), *get_node()->get_clock(), 1000,
+      "Wheel vel (rad/s): FL=%.3f FR=%.3f RR=%.3f RL=%.3f | ref: vx=%.3f vy=%.3f wz=%.3f",
+      wheel_front_left_vel, wheel_front_right_vel,
+      wheel_rear_right_vel, wheel_rear_left_vel,
+      reference_interfaces_[0], reference_interfaces_[1], reference_interfaces_[2]);
   }
   else
   {

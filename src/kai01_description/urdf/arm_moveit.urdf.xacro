@@ -2,6 +2,29 @@
 <robot name="arm" xmlns:xacro="http://ros.org/wiki/xacro">
   <xacro:property name="M_PI"   value="3.1415926535897931"/>
 
+  <link
+    name="base_link"> <!-- 移动底盘底座 -->
+  </link>
+<!-- 机械臂底座连接关节 -->
+  <joint
+    name="arm_joint1"
+    type="revolute">
+    <origin
+      xyz="0.0251328065010765 0 0.0774026880954513"
+      rpy="0 0 0" />
+    <parent
+      link="base_link" />
+    <child
+      link="arm_base_link" />
+    <axis
+      xyz="0 0 -1" />
+    <limit
+      lower="-2.09"
+      upper="2.09"
+      effort="1000"
+      velocity="10" />
+  </joint>   
+
   <link  
     name="arm_base_link"> <!-- 机械臂底座 -->
     <inertial>
@@ -26,7 +49,6 @@
         <mesh
           filename="package://kai01_description/meshes/arm/arm_base_link.STL" />
       </geometry>
-      <material name="green"/>
     </visual>
     <collision>
       <origin
@@ -133,7 +155,6 @@
         <mesh
           filename="package://kai01_description/meshes/arm/Link_1.STL" />
       </geometry>
-      <material name="green"/>
     </visual>
     <collision>
       <origin
@@ -190,7 +211,6 @@
         <mesh
           filename="package://kai01_description/meshes/arm/Link_2.STL" />
       </geometry>
-      <material name="green"/>
     </visual>
     <collision>
       <origin
@@ -246,7 +266,6 @@
         <mesh
           filename="package://kai01_description/meshes/arm/Link_3.STL" />
       </geometry>
-      <material name="green"/>
     </visual>
     <collision>
       <origin
@@ -366,21 +385,6 @@
     </collision>
   </link>
 
-  <link name="gripper" /> <!-- 夹爪中心点（虚拟） -->
-
-  <joint
-    name="gripper_to_tcp"
-    type="fixed">
-    <origin
-      xyz="0 0 0.065"
-      rpy="0 0 0" />
-    <parent
-      link="coupling" />
-    <child
-      link="gripper" />
-    <axis
-      xyz="0 0 0" />
-  </joint>
 
   <joint
     name="gripper_joint"

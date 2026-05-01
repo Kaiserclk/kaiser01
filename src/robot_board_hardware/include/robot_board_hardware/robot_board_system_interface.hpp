@@ -25,8 +25,9 @@ constexpr double GRAVITY = 9.80665;
 constexpr double DEG_TO_RAD = M_PI / 180.0;
 constexpr double TWO_PI = 2.0 * M_PI;
 
-inline double raw_to_rad(double raw) { return raw * SERVO_ANGLE_RANGE_RAD / SERVO_RAW_MAX; }
-inline double rad_to_raw(double rad) { return rad * SERVO_RAW_MAX / SERVO_ANGLE_RANGE_RAD; }
+// Radians per encoder tick: 240 degrees / 1000 ticks
+constexpr double RADIANS_PER_TICK = SERVO_ANGLE_RANGE_RAD / SERVO_RAW_MAX;
+constexpr double TICKS_PER_RADIAN = SERVO_RAW_MAX / SERVO_ANGLE_RANGE_RAD;
 
 class RobotBoardSystemInterface : public hardware_interface::SystemInterface
 {
@@ -91,6 +92,38 @@ private:
   {
     std::string name;       // 关节
     uint8_t servo_id = 0;  // 舵机ID
+    
+    // Calibration parameters (from URDF)
+    int zero_pulse = 500;   // Pulse width at 0 radians (zero position)
+    int min_pulse = 0;      // Minimum pulse width
+    int max_pulse = 1000;   // Maximum pulse width
+    bool flipped = false;   // True if min_pulse > max_pulse (reversed direction)
+    uint16_t servo_duration = 500; // Movement duration in ms (0=fastest)
+
+    // Initial joint angle at startup (radians)
+    double init_rad = 0.0;
+
+    // Computed joint limits in radians
+    double min_rad = 0.0;
+    double max_rad = 0.0;
+
+    // Convert radians to pulse width
+    uint16_t rad_to_pulse(double rad) const
+    {
+      double raw = rad * TICKS_PER_RADIAN;
+      double pulse = flipped ? (zero_pulse - raw) : (zero_pulse + raw);
+      pulse = std::clamp(pulse, static_cast<double>(min_pulse), static_cast<double>(max_pulse));
+      return static_cast<uint16_t>(std::round(pulse));
+    }
+
+    // Convert pulse width to radians
+    double pulse_to_rad(uint16_t pulse) const
+    {
+      double rad = flipped
+        ? (zero_pulse - static_cast<double>(pulse)) * RADIANS_PER_TICK
+        : (static_cast<double>(pulse) - zero_pulse) * RADIANS_PER_TICK;
+      return rad;
+    }
   };
   std::vector<ServoConfig> arm_servos_;
 

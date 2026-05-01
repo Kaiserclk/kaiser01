@@ -1,6 +1,6 @@
 controller_manager:
   ros__parameters:
-    update_rate: 20  # Hz
+    update_rate: 50  # Hz
 
     joint_state_broadcaster:
       type: joint_state_broadcaster/JointStateBroadcaster
@@ -18,10 +18,10 @@ controller_manager:
 mecanum_drive_controller:
   ros__parameters:
     # Wheel joint names (must match URDF joint names)
-    front_left_wheel_command_joint_name: front_left_wheel_joint
-    front_right_wheel_command_joint_name: front_right_wheel_joint
-    rear_right_wheel_command_joint_name: rear_right_wheel_joint
-    rear_left_wheel_command_joint_name: rear_left_wheel_joint
+    front_left_wheel_command_joint_name: wheel_left_front_joint
+    front_right_wheel_command_joint_name: wheel_right_front_joint
+    rear_right_wheel_command_joint_name: wheel_right_back_joint
+    rear_left_wheel_command_joint_name: wheel_left_back_joint
 
     # Kinematics parameters (must match physical robot)
     kinematics:
@@ -33,6 +33,7 @@ mecanum_drive_controller:
     odom_frame_id: odom
     enable_odom_tf: true
     tf_frame_prefix_enable: false
+    use_stamped_vel: false
 
     # Command timeout
     reference_timeout: 0.5
@@ -44,12 +45,12 @@ mecanum_drive_controller:
 arm_controller:
   ros__parameters:
     joints:
-      - arm_joint_1
-      - arm_joint_2
-      - arm_joint_3
-      - arm_joint_4
-      - arm_joint_5
-      - arm_joint_6
+      - arm_joint1
+      - arm_joint2
+      - arm_joint3
+      - arm_joint4
+      - arm_joint5
+      - arm_joint6
     interface_name: position
 
 imu_broadcaster:

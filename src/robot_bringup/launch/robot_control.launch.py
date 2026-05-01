@@ -12,7 +12,7 @@ def generate_launch_description():
     robot_description_content = Command([
         'xacro ',
         PathJoinSubstitution([
-            FindPackageShare('robot_bringup'), 'urdf', 'robot.urdf.xacro'
+            FindPackageShare('kai01_description'), 'urdf', 'kai01.urdf.xacro'
         ])
     ])
 

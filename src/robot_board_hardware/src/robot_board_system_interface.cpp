@@ -82,11 +82,57 @@ namespace robot_board_hardware
         ServoConfig sc;
         sc.name = joint.name;
         sc.servo_id = static_cast<uint8_t>(std::stoi(joint.parameters.at("servo_id")));
+        
+        // Read calibration parameters (optional, with defaults)
+        if (joint.parameters.count("zero")) {
+          sc.zero_pulse = std::stoi(joint.parameters.at("zero"));
+        }
+        if (joint.parameters.count("init")) {
+          sc.init_rad = std::stod(joint.parameters.at("init"));
+        }
+        if (joint.parameters.count("min")) {
+          sc.min_pulse = std::stoi(joint.parameters.at("min"));
+        }
+        if (joint.parameters.count("max")) {
+          sc.max_pulse = std::stoi(joint.parameters.at("max"));
+        }
+        
+        // Determine if joint is flipped (min > max)
+        sc.flipped = sc.min_pulse > sc.max_pulse;
+        if (sc.flipped) {
+          // Swap min/max for proper clamping
+          std::swap(sc.min_pulse, sc.max_pulse);
+        }
+        
+        // Read servo movement duration (ms), default 500ms
+        if (joint.parameters.count("servo_duration")) {
+          sc.servo_duration = static_cast<uint16_t>(std::stoi(joint.parameters.at("servo_duration")));
+        }
+        
+        // Compute joint limits in radians
+        sc.min_rad = sc.pulse_to_rad(sc.min_pulse);
+        sc.max_rad = sc.pulse_to_rad(sc.max_pulse);
+        
+        // For flipped joints, min_rad > max_rad; swap for correct clamp behavior
+        if (sc.min_rad > sc.max_rad) {
+          std::swap(sc.min_rad, sc.max_rad);
+        }
+        
+        RCLCPP_INFO(get_logger(), "Servo %s: id=%d, zero=%d, init=%.3f rad, range=[%d,%d], flipped=%s, duration=%dms, rad=[%.2f,%.2f]",
+            sc.name.c_str(), sc.servo_id, sc.zero_pulse, sc.init_rad,
+            sc.min_pulse, sc.max_pulse, sc.flipped ? "true" : "false",
+            sc.servo_duration, sc.min_rad, sc.max_rad);
+        
         arm_servos_.push_back(sc);
       }
     }
 
-    prev_arm_cmd_raw_.resize(arm_servos_.size(), 500.0); // default mid-position
+    prev_arm_cmd_raw_.resize(arm_servos_.size());
+    for (size_t i = 0; i < arm_servos_.size(); ++i)
+    {
+      // Initialize prev to init_rad's pulse so that the first write at init_rad is NOT sent
+      prev_arm_cmd_raw_[i] = static_cast<double>(arm_servos_[i].rad_to_pulse(arm_servos_[i].init_rad));
+    }
 
     RCLCPP_INFO(
         get_logger(), "RobotBoardSystemInterface initialized: %zu wheels, %zu arm servos, "
@@ -100,9 +146,16 @@ namespace robot_board_hardware
   {
     std::vector<hardware_interface::StateInterface> state_interfaces;
 
-    // Wheel velocity states
+    // Pre-reserve to avoid rehash during insertion.
+    // std::unordered_map rehash invalidates ALL pointers/references stored in StateInterface.
+    // Count: wheels + arm_servos + 10(IMU) + 1(battery) + 2(buttons) = N+13
+    hw_states_.reserve((wheels_.size() + arm_servos_.size() + 13) * 2);
+
+    // Wheel position and velocity states
     for (const auto &wc : wheels_)
     {
+      state_interfaces.emplace_back(hardware_interface::StateInterface(
+          wc.name, hardware_interface::HW_IF_POSITION, &hw_states_[wc.name + "/" + hardware_interface::HW_IF_POSITION]));
       state_interfaces.emplace_back(hardware_interface::StateInterface(
           wc.name, hardware_interface::HW_IF_VELOCITY, &hw_states_[wc.name + "/" + hardware_interface::HW_IF_VELOCITY]));
     }
@@ -152,6 +205,11 @@ namespace robot_board_hardware
   std::vector<hardware_interface::CommandInterface> RobotBoardSystemInterface::export_command_interfaces()
   {
     std::vector<hardware_interface::CommandInterface> command_interfaces;
+
+    // Pre-reserve to avoid rehash during insertion.
+    // std::unordered_map rehash invalidates ALL pointers/references stored in CommandInterface.
+    // Count: wheels + arm_servos + 4(LED) + 4(buzzer) = N+8
+    hw_commands_.reserve((wheels_.size() + arm_servos_.size() + 8) * 2);
 
     // Wheel velocity commands
     for (const auto &wc : wheels_)
@@ -235,13 +293,30 @@ namespace robot_board_hardware
     // Initialize state interfaces with default values
     for (const auto &wc : wheels_)
     {
+      hw_states_[wc.name + "/" + hardware_interface::HW_IF_POSITION] = 0.0;
       hw_states_[wc.name + "/" + hardware_interface::HW_IF_VELOCITY] = 0.0;
     }
 
-    for (size_t i = 0; i < arm_servos_.size(); ++i)
+    // Send init position command and sync state/command interfaces to init_rad
     {
-      double default_rad = raw_to_rad(500.0); // mid-position
-      hw_states_[arm_servos_[i].name + "/" + hardware_interface::HW_IF_POSITION] = default_rad;
+      std::vector<std::pair<uint8_t, uint16_t>> init_positions;
+      for (size_t i = 0; i < arm_servos_.size(); ++i)
+      {
+        uint16_t pulse = arm_servos_[i].rad_to_pulse(arm_servos_[i].init_rad);
+        init_positions.emplace_back(arm_servos_[i].servo_id, pulse);
+
+        // Sync state and command interfaces to init_rad
+        hw_states_[arm_servos_[i].name + "/" + hardware_interface::HW_IF_POSITION] = arm_servos_[i].init_rad;
+        hw_commands_[arm_servos_[i].name + "/" + hardware_interface::HW_IF_POSITION] = arm_servos_[i].init_rad;
+
+        // Sync prev_arm_cmd_raw_ so first write() won't resend immediately
+        prev_arm_cmd_raw_[i] = static_cast<double>(pulse);
+      }
+      uint16_t duration = arm_servos_.empty() ? 500 : arm_servos_[0].servo_duration;
+      auto data = PacketProtocol::build_bus_servo_position_cmd(duration, init_positions);
+      serial_port_->send_packet(static_cast<uint8_t>(PacketFunction::BUS_SERVO), data);
+      RCLCPP_INFO(rclcpp::get_logger("RobotBoardSystemInterface"),
+          "Sent init position command (duration=%dms)", duration);
     }
 
     // Initialize IMU with identity orientation and zero readings
@@ -296,7 +371,7 @@ namespace robot_board_hardware
   }
 
   hardware_interface::return_type RobotBoardSystemInterface::read(
-      const rclcpp::Time & /*time*/, const rclcpp::Duration & /*period*/)
+      const rclcpp::Time & /*time*/, const rclcpp::Duration & period)
   {
     if (!serial_port_)
     {
@@ -345,10 +420,15 @@ namespace robot_board_hardware
     }
 
     // Wheel velocity states: echo back command values (open-loop, no encoders)
+    // Wheel position states: integrate velocity over period
+    double dt = period.seconds();
     for (const auto &wc : wheels_)
     {
-      std::string cmd_name = wc.name + "/" + hardware_interface::HW_IF_VELOCITY;
-      hw_states_[cmd_name] = hw_commands_[cmd_name];
+      std::string vel_key = wc.name + "/" + hardware_interface::HW_IF_VELOCITY;
+      hw_states_[vel_key] = hw_commands_[vel_key];
+
+      std::string pos_key = wc.name + "/" + hardware_interface::HW_IF_POSITION;
+      hw_states_[pos_key] += hw_states_[vel_key] * dt;
     }
 
     // Arm servo position states: echo back command values
@@ -385,8 +465,23 @@ namespace robot_board_hardware
           rps = -rps;
         }
 
+        // if (std::abs(cmd_vel) > 1e-6)
+        // {
+        //   has_nonzero = true;
+        // }
+
         motor_speeds.emplace_back(wc.motor_id, static_cast<float>(rps));
       }
+
+      // if (has_nonzero)
+      // {
+      //   RCLCPP_INFO(get_logger(),
+      //       "Motor cmd: [id%d=%.4f, id%d=%.4f, id%d=%.4f, id%d=%.4f] (rps)",
+      //       motor_speeds[0].first, motor_speeds[0].second,
+      //       motor_speeds[1].first, motor_speeds[1].second,
+      //       motor_speeds[2].first, motor_speeds[2].second,
+      //       motor_speeds[3].first, motor_speeds[3].second);
+      // }
 
       auto data = PacketProtocol::build_motor_speed_cmd(motor_speeds);
       serial_port_->send_packet(
@@ -402,23 +497,27 @@ namespace robot_board_hardware
       {
         double cmd_rad = hw_commands_[arm_servos_[i].name + "/" + hardware_interface::HW_IF_POSITION];
 
-        // Convert radians to raw 0-1000
-        double raw = rad_to_raw(cmd_rad);
-        raw = std::clamp(raw, 0.0, SERVO_RAW_MAX);
+        // Clamp to joint limits
+        cmd_rad = std::clamp(cmd_rad, arm_servos_[i].min_rad, arm_servos_[i].max_rad);
 
-        // Only send if changed (threshold 0.5 raw units)
-        if (std::abs(raw - prev_arm_cmd_raw_[i]) > 0.5)
+        // Convert radians to pulse using calibrated parameters
+        uint16_t pulse = arm_servos_[i].rad_to_pulse(cmd_rad);
+
+        // Only send if changed (threshold 1 pulse)
+        if (std::abs(static_cast<double>(pulse) - prev_arm_cmd_raw_[i]) > 1.0)
         {
           has_changes = true;
-          prev_arm_cmd_raw_[i] = raw;
+          prev_arm_cmd_raw_[i] = static_cast<double>(pulse);
         }
 
-        positions.emplace_back(arm_servos_[i].servo_id, static_cast<uint16_t>(std::round(raw)));
+        positions.emplace_back(arm_servos_[i].servo_id, pulse);
       }
 
       if (has_changes)
       {
-        auto data = PacketProtocol::build_bus_servo_position_cmd(0, positions); // duration=0 (immediate)
+        // Use first servo's duration as the movement time for all servos in this batch
+        uint16_t duration = arm_servos_.empty() ? 500 : arm_servos_[0].servo_duration;
+        auto data = PacketProtocol::build_bus_servo_position_cmd(duration, positions);
         serial_port_->send_packet(
             static_cast<uint8_t>(PacketFunction::BUS_SERVO), data);
       }

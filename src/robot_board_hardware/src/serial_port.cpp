@@ -7,6 +7,7 @@
 #include <unistd.h>
 #include <sys/ioctl.h>
 
+
 namespace robot_board_hardware
 {
 
@@ -142,7 +143,12 @@ bool SerialPort::raw_write(const std::vector<uint8_t> & data)
     return false;
   }
   ssize_t written = ::write(fd_, data.data(), data.size());
-  return written == static_cast<ssize_t>(data.size());
+  if (written != static_cast<ssize_t>(data.size())) {
+    return false;
+  }
+  // Ensure data is physically transmitted (not just buffered in OS)
+  tcdrain(fd_);
+  return true;
 }
 
 /*
@@ -154,6 +160,24 @@ bool SerialPort::raw_write(const std::vector<uint8_t> & data)
 bool SerialPort::send_packet(uint8_t function, const std::vector<uint8_t> & data)
 {
   auto packet = PacketProtocol::build_packet(function, data);
+
+  // Debug: hex dump for motor packets (function==3), throttled
+  // if (function == 3) {
+  //   static int motor_dump_count = 0;
+  //   if (motor_dump_count < 3) {
+  //     motor_dump_count++;
+  //     std::string hex;
+  //     hex.reserve(packet.size() * 3);
+  //     for (uint8_t b : packet) {
+  //       char buf[4];
+  //       snprintf(buf, sizeof(buf), "%02X ", b);
+  //       hex += buf;
+  //     }
+  //     RCLCPP_INFO(rclcpp::get_logger("SerialPort"),
+  //         "TX motor packet (%zu bytes): %s", packet.size(), hex.c_str());
+  //   }
+  // }
+
   std::lock_guard<std::mutex> lock(write_mutex_);
   return raw_write(packet);
 }

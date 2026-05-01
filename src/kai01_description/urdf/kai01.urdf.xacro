@@ -10,9 +10,8 @@
 
   <!-- 硬件接口 -->
   <xacro:include filename="$(find kai01_description)/ros2_control/kai01.ros2_control.xacro"/><!-- 硬件接口描述 -->
-  <xacro:kai01_interface 
-    name= "KAI01_INTERFACE"
-    prefix="$(arg prefix)" />
+  <xacro:kai01_interface name="RobotBoardSystem" prefix=""/>
+
 
 
 <!-- 机械臂底座连接关节 -->

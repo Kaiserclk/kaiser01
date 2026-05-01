@@ -1,0 +1,39 @@
+controller_manager:
+  ros__parameters:
+    arm_position_controller:
+      type: forward_command_controller/ForwardCommandController
+
+    arm_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
+
+    hand_controller:
+      type: position_controllers/GripperActionController
+
+arm_position_controller: # Position controller for arm joints
+  ros__parameters:
+    joints:
+      - arm_joint1
+      - arm_joint2
+      - arm_joint3
+      - arm_joint4
+      - arm_joint5
+      - arm_joint6
+    interface_name: position
+
+arm_controller: # Trajectory controller for arm joints
+  ros__parameters:
+    joints:
+      - arm_joint1
+      - arm_joint2
+      - arm_joint3
+      - arm_joint4
+      - arm_joint5
+    command_interfaces:
+      - position
+      - velocity
+    state_interfaces:
+      - position
+      - velocity
+hand_controller: # Gripper controller for hand joint
+  ros__parameters:
+    joint: arm_joint6
