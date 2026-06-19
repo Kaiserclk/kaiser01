@@ -1,11 +1,9 @@
 #include "robot_board_hardware/robot_board_system_interface.hpp"
-
 #include <algorithm>
 #include <cmath>
 #include <limits>
 #include <string>
 #include <vector>
-
 #include "hardware_interface/types/hardware_interface_type_values.hpp"
 #include "pluginlib/class_list_macros.hpp"
 
@@ -20,7 +18,7 @@ namespace robot_board_hardware
   hardware_interface::CallbackReturn RobotBoardSystemInterface::on_init(
       const hardware_interface::HardwareInfo &hardware_info)
   {
-    // Initialize base class
+    // 初始化基类
     if (hardware_interface::SystemInterface::on_init(hardware_info) !=
         hardware_interface::CallbackReturn::SUCCESS)
     {
@@ -28,12 +26,11 @@ namespace robot_board_hardware
     }
 
     // Get logger and clock
-    logger_ = std::make_shared<rclcpp::Logger>(
-        rclcpp::get_logger("RobotBoardSystemInterface"));
+    logger_ = std::make_shared<rclcpp::Logger>(rclcpp::get_logger("RobotBoardSystemInterface"));
     clock_ = std::make_shared<rclcpp::Clock>(rclcpp::Clock());
     const auto &hw_info = info_;
 
-    // Read hardware parameters
+    // 检查并初始化串口参数
     if (!hw_info.hardware_parameters.count("serial_port"))
     {
       RCLCPP_ERROR(get_logger(), "Missing serial port parameter");
@@ -148,8 +145,8 @@ namespace robot_board_hardware
 
     // Pre-reserve to avoid rehash during insertion.
     // std::unordered_map rehash invalidates ALL pointers/references stored in StateInterface.
-    // Count: wheels + arm_servos + 10(IMU) + 1(battery) + 2(buttons) = N+13
-    hw_states_.reserve((wheels_.size() + arm_servos_.size() + 13) * 2);
+    // Count: wheels*2 + arm_servos*2 + 10(IMU) + 1(battery) + 2(buttons) = N+13
+    hw_states_.reserve((wheels_.size() * 2 + arm_servos_.size() * 2 + 13) * 2);
 
     // Wheel position and velocity states
     for (const auto &wc : wheels_)
@@ -160,11 +157,13 @@ namespace robot_board_hardware
           wc.name, hardware_interface::HW_IF_VELOCITY, &hw_states_[wc.name + "/" + hardware_interface::HW_IF_VELOCITY]));
     }
 
-    // Arm servo position states
+    // Arm servo position and velocity states
     for (const auto &sc : arm_servos_)
     {
       state_interfaces.emplace_back(hardware_interface::StateInterface(
           sc.name, hardware_interface::HW_IF_POSITION, &hw_states_[sc.name + "/" + hardware_interface::HW_IF_POSITION]));
+      state_interfaces.emplace_back(hardware_interface::StateInterface(
+          sc.name, hardware_interface::HW_IF_VELOCITY, &hw_states_[sc.name + "/" + hardware_interface::HW_IF_VELOCITY]));
     }
 
     // IMU states
@@ -309,6 +308,9 @@ namespace robot_board_hardware
         hw_states_[arm_servos_[i].name + "/" + hardware_interface::HW_IF_POSITION] = arm_servos_[i].init_rad;
         hw_commands_[arm_servos_[i].name + "/" + hardware_interface::HW_IF_POSITION] = arm_servos_[i].init_rad;
 
+        // Initialize velocity state to 0.0
+        hw_states_[arm_servos_[i].name + "/" + hardware_interface::HW_IF_VELOCITY] = 0.0;
+
         // Sync prev_arm_cmd_raw_ so first write() won't resend immediately
         prev_arm_cmd_raw_[i] = static_cast<double>(pulse);
       }
@@ -432,10 +434,17 @@ namespace robot_board_hardware
     }
 
     // Arm servo position states: echo back command values
+    // Arm servo velocity states: estimate from position difference over period
     for (const auto &sc : arm_servos_)
     {
-      std::string cmd_name = sc.name + "/" + hardware_interface::HW_IF_POSITION;
-      hw_states_[cmd_name] = hw_commands_[cmd_name];
+      std::string pos_key = sc.name + "/" + hardware_interface::HW_IF_POSITION;
+      std::string vel_key = sc.name + "/" + hardware_interface::HW_IF_VELOCITY;
+      double prev_pos = hw_states_[pos_key];
+      hw_states_[pos_key] = hw_commands_[pos_key];
+      if (dt > 1e-9)
+      {
+        hw_states_[vel_key] = (hw_states_[pos_key] - prev_pos) / dt;
+      }
     }
 
     return hardware_interface::return_type::OK;
@@ -465,23 +474,9 @@ namespace robot_board_hardware
           rps = -rps;
         }
 
-        // if (std::abs(cmd_vel) > 1e-6)
-        // {
-        //   has_nonzero = true;
-        // }
-
         motor_speeds.emplace_back(wc.motor_id, static_cast<float>(rps));
       }
 
-      // if (has_nonzero)
-      // {
-      //   RCLCPP_INFO(get_logger(),
-      //       "Motor cmd: [id%d=%.4f, id%d=%.4f, id%d=%.4f, id%d=%.4f] (rps)",
-      //       motor_speeds[0].first, motor_speeds[0].second,
-      //       motor_speeds[1].first, motor_speeds[1].second,
-      //       motor_speeds[2].first, motor_speeds[2].second,
-      //       motor_speeds[3].first, motor_speeds[3].second);
-      // }
 
       auto data = PacketProtocol::build_motor_speed_cmd(motor_speeds);
       serial_port_->send_packet(

@@ -1,0 +1,60 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "普通编译",
+            "type": "shell",
+            "command": "colcon",
+            "args": [
+                "build",
+                "--packages-select",
+                "${input:normalPackage}",
+                "--symlink-install"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": "build",
+            "problemMatcher": []
+        },
+        {
+            "label": "链接编译",
+            "type": "shell",
+            "command": "colcon",
+            "args": [
+                "build",
+                "--packages-select",
+                "${input:symlinkPackage}",
+                "--symlink-install"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": "build",
+            "problemMatcher": []
+        }
+    ],
+    "inputs": [
+        {
+            "id": "normalPackage",
+            "type": "pickString",
+            "description": "选择要编译的功能包",
+            "options": [
+                "kai01_description",
+                "kai01_gazebo_simulation",
+                "mecanum_drive_controller",
+                "robot_board_hardware"
+            ],
+            "default": "kai01_description"
+        },
+        {
+            "id": "symlinkPackage",
+            "type": "pickString",
+            "description": "选择要链接编译的功能包",
+            "options": [
+                "robot_bringup"
+            ],
+            "default": "robot_bringup"
+        }
+    ]
+}
