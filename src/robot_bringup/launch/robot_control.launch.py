@@ -53,7 +53,7 @@ def generate_launch_description():
             ('~/robot_description', '/robot_description'),
             # mecanum_drive_controller 话题重映射
             ('/mecanum_drive_controller/cmd_vel', '/cmd_vel'),
-            ('/mecanum_drive_controller/odometry', '/odom_raw'),
+            ('/mecanum_drive_controller/odometry', '/odom'),
             ('/mecanum_drive_controller/tf_odometry', '/tf'),
             ('/imu_broadcaster/imu', '/imu/data_raw')
         ],
@@ -72,7 +72,11 @@ def generate_launch_description():
     joint_state_broadcaster_spawner = Node(
         package='controller_manager',
         executable='spawner',
-        arguments=['joint_state_broadcaster', '--controller-manager', '/controller_manager'],
+        arguments=[
+            'joint_state_broadcaster',
+            '--controller-manager', '/controller_manager',
+            '--controller-manager-timeout', '30.0'
+        ],
         output='screen',
     )
 
@@ -80,7 +84,11 @@ def generate_launch_description():
     mecanum_drive_controller_spawner = Node(
         package='controller_manager',
         executable='spawner',
-        arguments=['mecanum_drive_controller', '--controller-manager', '/controller_manager'],
+        arguments=[
+            'mecanum_drive_controller',
+            '--controller-manager', '/controller_manager',
+            '--controller-manager-timeout', '30.0'
+        ],
         output='screen',
     )
 
@@ -89,7 +97,11 @@ def generate_launch_description():
         condition=IfCondition(EqualsSubstitution(ArmControllerType, 'arm_controller')),
         package='controller_manager',
         executable='spawner',
-        arguments=['arm_position_controller', '--controller-manager', '/controller_manager'],
+        arguments=[
+            'arm_position_controller',
+            '--controller-manager', '/controller_manager',
+            '--controller-manager-timeout', '30.0'
+        ],
         output='screen',
     )
     
@@ -98,14 +110,22 @@ def generate_launch_description():
         condition=IfCondition(EqualsSubstitution(ArmControllerType, 'moveit_controller')),
         package='controller_manager',
         executable='spawner',
-        arguments=['arm_controller', '--controller-manager', '/controller_manager'],
+        arguments=[
+            'arm_controller',
+            '--controller-manager', '/controller_manager',
+            '--controller-manager-timeout', '30.0'
+        ],
         output='screen',
     )
     hand_controller_spawner = Node(
         condition=IfCondition(EqualsSubstitution(ArmControllerType, 'moveit_controller')),
         package='controller_manager',
         executable='spawner',
-        arguments=['hand_controller', '--controller-manager', '/controller_manager'],
+        arguments=[
+            'hand_controller',
+            '--controller-manager', '/controller_manager',
+            '--controller-manager-timeout', '30.0'
+        ],
         output='screen',
     )
 
@@ -113,7 +133,11 @@ def generate_launch_description():
     imu_broadcaster_spawner = Node(
         package='controller_manager',
         executable='spawner',
-        arguments=['imu_broadcaster', '--controller-manager', '/controller_manager'],
+        arguments=[
+            'imu_broadcaster',
+            '--controller-manager', '/controller_manager',
+            '--controller-manager-timeout', '30.0'
+        ],
         output='screen',
     )
 
@@ -140,7 +164,7 @@ def generate_launch_description():
                         mecanum_drive_controller_spawner,
                         arm_position_controller_spawner,
                         arm_controller_spawner,
-                        hand_controller_spawner,
+                        # hand_controller_spawner,
                         imu_broadcaster_spawner,
                     ],
                 ),

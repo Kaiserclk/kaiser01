@@ -2,6 +2,20 @@
 <robot name="arm" xmlns:xacro="http://ros.org/wiki/xacro">
   <xacro:property name="M_PI"   value="3.1415926535897931"/>
 
+  <link name="gripper_tcp"> </link>
+
+  <joint
+    name="gripper_tcp_coupling"
+    type="fixed">
+    <origin
+      xyz="0 0 0.117"
+      rpy="0 0 0" />
+    <parent
+      link="coupling" />
+    <child
+      link="gripper_tcp" />
+  </joint>
+
   <link  
     name="arm_base_link"> <!-- 机械臂底座 -->
     <inertial>

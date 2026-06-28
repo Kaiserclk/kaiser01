@@ -1,0 +1,11 @@
+# Udev rule for robot board serial port
+# This creates a stable symlink /dev/robot_board for the robot's main controller
+#
+# Device identification:
+# - Vendor ID: 1a86
+# - Product ID: 55d4
+# - Serial: 574A001679
+#
+# Usage: In your code/config, use /dev/robot_board instead of /dev/ttyACM0
+
+SUBSYSTEM=="tty", ATTRS{idVendor}=="1a86", ATTRS{idProduct}=="55d4", ATTRS{serial}=="574A001679", SYMLINK+="robot_board", MODE="0666"

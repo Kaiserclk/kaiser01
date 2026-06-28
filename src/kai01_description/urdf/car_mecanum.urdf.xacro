@@ -15,6 +15,17 @@
     <origin xyz="0.0 0.0 ${0.0965/2 + 0.0678410821576746}" rpy="0 0 0"/>
   </joint>
 
+
+  <link name="measure"/><!-- 测量点 -->
+
+  <joint name="measure_joint" type="fixed">
+    <parent link="base_footprint"/>
+    <child link="measure"/>
+    <origin xyz="0.153 0.0 0.0" rpy="0 0 0"/>
+  </joint>
+
+
+
   <link
     name="base_link"> <!-- 下底盘 -->
     <xacro:box_inertial m="${base_link_mass}" w="${base_link_w}" h="${base_link_h}" d="${base_link_d}" x="0" y="0" z="-0.115" />

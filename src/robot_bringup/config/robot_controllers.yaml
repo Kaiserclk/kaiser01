@@ -1,6 +1,6 @@
 controller_manager:
   ros__parameters:
-    update_rate: 10  # Hz
+    update_rate: 20  # Hz
 
     joint_state_broadcaster:
       type: joint_state_broadcaster/JointStateBroadcaster
@@ -48,4 +48,18 @@ imu_broadcaster:
     static_covariance_linear_acceleration: [0.0004, 0.0, 0.0, 0.0, 0.0004, 0.0, 0.0, 0.0, 0.004]
 
 joint_state_broadcaster:
-  ros__parameters: {}
+  ros__parameters: 
+    joints:
+      - wheel_left_front_joint
+      - wheel_left_back_joint
+      - wheel_right_front_joint
+      - wheel_right_back_joint
+      - arm_joint1
+      - arm_joint2
+      - arm_joint3
+      - arm_joint4
+      - arm_joint5
+      - arm_joint6
+    interfaces:
+      - position
+      - velocity

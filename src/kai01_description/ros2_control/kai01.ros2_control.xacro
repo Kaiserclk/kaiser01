@@ -7,7 +7,7 @@
   <ros2_control name="RobotBoardSystem" type="system">
     <hardware>
       <plugin>robot_board_hardware/RobotBoardSystemInterface</plugin>
-      <param name="serial_port">/dev/ttyACM0</param>
+      <param name="serial_port">/dev/robot_board</param>
       <param name="baud_rate">1000000</param>
     </hardware>
 

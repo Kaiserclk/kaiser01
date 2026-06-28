@@ -272,6 +272,24 @@ namespace robot_board_hardware
 
     RCLCPP_INFO(rclcpp::get_logger("RobotBoardSystemInterface"), "Serial port configured and recv thread started");
 
+    // Create custom node and service for servo torque control
+    try {
+      custom_node_ = std::make_shared<rclcpp::Node>("robot_board_hardware");
+      
+      servo_torque_service_ = custom_node_->create_service<std_srvs::srv::SetBool>(
+        "~/set_servo_torque",
+        std::bind(&RobotBoardSystemInterface::servo_torque_callback, this, std::placeholders::_1, std::placeholders::_2));
+      
+      // Start a thread to spin the node so services are processed
+      node_spin_thread_ = std::thread([this]() {
+        rclcpp::spin(custom_node_);
+      });
+      node_spin_thread_.detach();
+      
+      RCLCPP_INFO(get_logger(), "Servo torque service created and node spinning: ~/set_servo_torque");
+    } catch (const std::exception &e) {
+      RCLCPP_WARN(get_logger(), "Failed to create servo torque service: %s", e.what());
+    }
 
     return hardware_interface::CallbackReturn::SUCCESS;
   }
@@ -296,6 +314,10 @@ namespace robot_board_hardware
       hw_states_[wc.name + "/" + hardware_interface::HW_IF_VELOCITY] = 0.0;
     }
 
+    // Initialize previous motor speeds cache (for change detection in write())
+    prev_motor_speeds_.resize(wheels_.size(), 0.0f);
+    prev_motor_speeds_initialized_ = true;
+
     // Send init position command and sync state/command interfaces to init_rad
     {
       std::vector<std::pair<uint8_t, uint16_t>> init_positions;
@@ -319,6 +341,12 @@ namespace robot_board_hardware
       serial_port_->send_packet(static_cast<uint8_t>(PacketFunction::BUS_SERVO), data);
       RCLCPP_INFO(rclcpp::get_logger("RobotBoardSystemInterface"),
           "Sent init position command (duration=%dms)", duration);
+      
+      // Wait for servos to move to init position before starting read loop
+      // This prevents read() from reading the pre-init position
+      std::this_thread::sleep_for(std::chrono::milliseconds(duration + 200));
+      RCLCPP_INFO(rclcpp::get_logger("RobotBoardSystemInterface"),
+          "Init position movement complete, starting normal operation");
     }
 
     // Initialize IMU with identity orientation and zero readings
@@ -433,20 +461,38 @@ namespace robot_board_hardware
       hw_states_[pos_key] += hw_states_[vel_key] * dt;
     }
 
-    // Arm servo position states: echo back command values
-    // Arm servo velocity states: estimate from position difference over period
     for (const auto &sc : arm_servos_)
     {
       std::string pos_key = sc.name + "/" + hardware_interface::HW_IF_POSITION;
       std::string vel_key = sc.name + "/" + hardware_interface::HW_IF_VELOCITY;
       double prev_pos = hw_states_[pos_key];
-      hw_states_[pos_key] = hw_commands_[pos_key];
+      
+      auto pulse_opt = serial_port_->read_bus_servo_position(sc.servo_id);
+
+      if (pulse_opt.has_value())
+      {
+        // Convert pulse to radians
+        int16_t pulse = pulse_opt.value();
+        double actual_rad = sc.pulse_to_rad(pulse);
+        hw_states_[pos_key] = actual_rad;
+        
+        // Update command to match actual position for smooth transition
+        hw_commands_[pos_key] = actual_rad;
+      }
+      else
+      {
+        // Read failed: keep last known position
+        RCLCPP_WARN_THROTTLE(
+            get_logger(), *clock_, 5000,
+            "Failed to read servo %d position, using last known value", sc.servo_id);
+
+      }
+      
       if (dt > 1e-9)
       {
         hw_states_[vel_key] = (hw_states_[pos_key] - prev_pos) / dt;
       }
     }
-
     return hardware_interface::return_type::OK;
   }
 
@@ -458,11 +504,14 @@ namespace robot_board_hardware
       return hardware_interface::return_type::ERROR;
     }
 
-    // Write wheel motor speeds
+    // Write wheel motor speeds (only if changed)
     {
       std::vector<std::pair<uint8_t, float>> motor_speeds;
-      for (const auto &wc : wheels_)
+      bool has_changes = false;
+      
+      for (size_t i = 0; i < wheels_.size(); ++i)
       {
+        const auto &wc = wheels_[i];
         double cmd_vel = hw_commands_[wc.name + "/" + hardware_interface::HW_IF_VELOCITY];
 
         // Convert from rad/s to RPS
@@ -473,17 +522,35 @@ namespace robot_board_hardware
         {
           rps = -rps;
         }
+        
+        float rps_float = static_cast<float>(rps);
+        motor_speeds.emplace_back(wc.motor_id, rps_float);
 
-        motor_speeds.emplace_back(wc.motor_id, static_cast<float>(rps));
+        // Check if speed changed (threshold: 0.001 RPS)
+        if (!prev_motor_speeds_initialized_ || 
+            std::abs(rps_float - prev_motor_speeds_[i]) > 0.001f)
+        {
+          has_changes = true;
+        }
       }
 
-
-      auto data = PacketProtocol::build_motor_speed_cmd(motor_speeds);
-      serial_port_->send_packet(
-          static_cast<uint8_t>(PacketFunction::MOTOR), data);
+      // Only send if any motor speed changed
+      if (has_changes)
+      {
+        auto data = PacketProtocol::build_motor_speed_cmd(motor_speeds);
+        serial_port_->send_packet(
+            static_cast<uint8_t>(PacketFunction::MOTOR), data);
+        
+        // Update cache
+        for (size_t i = 0; i < motor_speeds.size(); ++i)
+        {
+          prev_motor_speeds_[i] = motor_speeds[i].second;
+        }
+      }
     }
 
-    // Write arm servo positions
+    // Write arm servo positions (only if torque is enabled)
+    if (servo_torque_enabled_.load())
     {
       std::vector<std::pair<uint8_t, uint16_t>> positions;
       bool has_changes = false;
@@ -559,6 +626,50 @@ namespace robot_board_hardware
     }
 
     return hardware_interface::return_type::OK;
+  }
+
+  void RobotBoardSystemInterface::servo_torque_callback(
+      const std::shared_ptr<std_srvs::srv::SetBool::Request> request,
+      std::shared_ptr<std_srvs::srv::SetBool::Response> response)
+  {
+    if (!serial_port_)
+    {
+      response->success = false;
+      response->message = "Serial port not initialized";
+      RCLCPP_ERROR(get_logger(), "Servo torque service called but serial port not ready");
+      return;
+    }
+
+    bool enable = request->data;
+    try {
+      
+      for (const auto &sc : arm_servos_)
+      {
+        auto data = PacketProtocol::build_bus_servo_enable_torque_cmd(sc.servo_id, enable);
+        
+        // Log the raw packet for debugging
+        std::string hex_data;
+        for (auto byte : data) {
+          hex_data += std::to_string(byte) + " ";
+        }
+        serial_port_->send_packet(
+            static_cast<uint8_t>(PacketFunction::BUS_SERVO), data);
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+      }
+
+      // Update torque state flag - this controls whether write() sends position commands
+      servo_torque_enabled_.store(enable);
+
+      response->success = true;
+      response->message = enable ? 
+        "Successfully enabled torque on all servos" : 
+        "Successfully disabled torque on all servos";
+      RCLCPP_INFO(get_logger(), "%s", response->message.c_str());
+    } catch (const std::exception &e) {
+      response->success = false;
+      response->message = std::string("Failed to set servo torque: ") + e.what();
+      RCLCPP_ERROR(get_logger(), "%s", response->message.c_str());
+    }
   }
 
 } // namespace robot_board_hardware

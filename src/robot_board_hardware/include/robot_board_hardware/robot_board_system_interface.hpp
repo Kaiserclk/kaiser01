@@ -11,6 +11,7 @@
 #include "hardware_interface/types/hardware_interface_return_values.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "rclcpp_lifecycle/state.hpp"
+#include "std_srvs/srv/set_bool.hpp"
 #include "robot_board_hardware/serial_port.hpp"
 #include "robot_board_hardware/visibility_control.h"
 
@@ -71,7 +72,6 @@ public:
   // Get the clock of the SystemInterface
   rclcpp::Clock::SharedPtr get_clock() const { return clock_; }
 
-
 private:
   // Serial communication
   std::unique_ptr<SerialPort> serial_port_;
@@ -130,6 +130,10 @@ private:
   // Cached previous arm commands for change detection
   std::vector<double> prev_arm_cmd_raw_;
 
+  // Cached previous wheel motor commands for change detection (in RPS)
+  std::vector<float> prev_motor_speeds_;
+  bool prev_motor_speeds_initialized_ = false;
+
   // GPIO state tracking for change detection
   double prev_led_on_time_ = 0.0;
   double prev_buzzer_freq_ = 0.0;
@@ -138,6 +142,20 @@ private:
   std::unordered_map<std::string, double> hw_states_;
   std::unordered_map<std::string, double> hw_commands_;
 
+  // ROS service for servo torque control
+  rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr servo_torque_service_;
+  
+  // Custom node for ROS communication
+  rclcpp::Node::SharedPtr custom_node_;
+  std::thread node_spin_thread_;  // Thread to spin the node
+  
+  // Torque enabled state tracking
+  std::atomic<bool> servo_torque_enabled_{true};
+  
+  // Service callback
+  void servo_torque_callback(
+    const std::shared_ptr<std_srvs::srv::SetBool::Request> request,
+    std::shared_ptr<std_srvs::srv::SetBool::Response> response);
 
   std::shared_ptr<rclcpp::Logger> logger_;
   rclcpp::Clock::SharedPtr clock_;

@@ -5,7 +5,7 @@
 运行方式：
   python3 src/robot_bringup/scripts/read_arm_servo.py           # 读取配置的6个关节
   python3 src/robot_bringup/scripts/read_arm_servo.py --scan   # 扫描所有在线舵机(ID 1-15)
-  python3 src/robot_bringup/scripts/read_arm_servo.py /dev/ttyACM0 --scan
+  python3 src/robot_bringup/scripts/read_arm_servo.py /dev/robot_board --scan
 """
 
 import sys
@@ -13,7 +13,7 @@ import time
 import math
 
 # 将参考 SDK 加入路径
-SDK_PATH = "/home/sunrise/kaiser01/参考文件/driver/ros_robot_controller/ros_robot_controller"
+SDK_PATH = "/home/sunrise/kaiser01/driver/ros_robot_controller/ros_robot_controller"
 sys.path.insert(0, SDK_PATH)
 
 from ros_robot_controller_sdk import Board  # type: ignore
@@ -89,7 +89,7 @@ def main():
     args = sys.argv[1:]
     scan_mode = "--scan" in args
     device_args = [a for a in args if not a.startswith("-")]
-    device = device_args[0] if device_args else "/dev/ttyACM0"
+    device = device_args[0] if device_args else "/dev/robot_board"
 
     print(f"连接串口: {device} @ 1000000 baud ...")
     board = Board(device=device, baudrate=1000000)

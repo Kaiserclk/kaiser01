@@ -58,9 +58,9 @@ def generate_launch_description():
     )
 
     return LaunchDescription([
-        DeclareLaunchArgument('use_camera', default_value='False',
+        DeclareLaunchArgument('use_camera', default_value='True',
                               description='是否启动相机'),
-        DeclareLaunchArgument('use_radia', default_value='True',
+        DeclareLaunchArgument('use_radia', default_value='False',
                               description='是否启动雷达'),
         g4_node,
         camera_launch

@@ -25,7 +25,7 @@ def generate_launch_description():
         DeclareLaunchArgument('point_cloud_qos', default_value='default'),
         DeclareLaunchArgument('connection_delay', default_value='100'), #重新打开设备的延迟时间（毫秒）。
         DeclareLaunchArgument('color_width', default_value='640'), #彩色图像的宽度（像素）。
-        DeclareLaunchArgument('color_height', default_value='360'), #彩色图像的高度（像素）。
+        DeclareLaunchArgument('color_height', default_value='480'), #彩色图像的高度（像素）。
         DeclareLaunchArgument('color_fps', default_value='30'), #彩色图像的帧率（fps）。
         DeclareLaunchArgument('color_format', default_value='MJPG'), #彩色图像的格式，可选值有：'MJPG', 'YUYV', 'RGB8', 'BGR8'。
         DeclareLaunchArgument('enable_color', default_value='true'), #是否启用彩色图像。
@@ -39,7 +39,7 @@ def generate_launch_description():
         DeclareLaunchArgument('enable_color_auto_white_balance', default_value='true'),
         DeclareLaunchArgument('color_white_balance', default_value='-1'),
         DeclareLaunchArgument('depth_width', default_value='640'), #深度图像的宽度（像素）。
-        DeclareLaunchArgument('depth_height', default_value='360'), #深度图像的高度（像素）。
+        DeclareLaunchArgument('depth_height', default_value='480'), #深度图像的高度（像素）。
         DeclareLaunchArgument('depth_fps', default_value='10'), #深度图像的帧率（fps）。
         DeclareLaunchArgument('depth_format', default_value='Y11'), #深度图像的格式，可选值有：'Y10', 'Y11', 'Y12'。
         DeclareLaunchArgument('enable_depth', default_value='true'), #是否启用深度图像。
@@ -72,7 +72,7 @@ def generate_launch_description():
         DeclareLaunchArgument('soft_filter_speckle_size', default_value='-1'),
         DeclareLaunchArgument('ordered_pc', default_value='true'),   #过滤无效点云
         DeclareLaunchArgument('enable_depth_scale', default_value='true'),
-        DeclareLaunchArgument('align_mode', default_value='HW'),      #启用深度帧与彩色帧的对齐,硬件对其
+        # DeclareLaunchArgument('align_mode', default_value='HW'),      #启用深度帧与彩色帧的对齐,硬件对其
         DeclareLaunchArgument('laser_energy_level', default_value='-1'),
         DeclareLaunchArgument('enable_heartbeat', default_value='false'),   #是否启用心跳包
     ]
