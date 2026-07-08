@@ -1,0 +1,16 @@
+<library path="forward_command_controller">
+  <class name="forward_command_controller/ForwardCommandController" type="forward_command_controller::ForwardCommandController" base_class_type="controller_interface::ControllerInterface">
+  <description>
+    Forward command controller for a group of joints.
+    Subscribes to ~/commands (Float64MultiArray) for position-only multi-joint control,
+    and ~/single_joint_command (JointCommand) for single-joint position+duration control.
+  </description>
+  </class>
+  <class name="forward_command_controller/MultiInterfaceForwardCommandController"
+         type="forward_command_controller::MultiInterfaceForwardCommandController" base_class_type="controller_interface::ControllerInterface">
+    <description>
+      Multi-interface forward controller for synchronized multi-joint position+duration control.
+      Subscribes to ~/multi_joint_command (JointGroupCommand) with per-joint position_rad and duration_ms.
+    </description>
+  </class>
+</library>

@@ -14,7 +14,7 @@ def generate_launch_description():
     declared_arguments.append(
         DeclareLaunchArgument(
             "ArmControllerType",
-            default_value='moveit_controller',
+            default_value='arm_controller',
             description="控制器类型arm_controller:常规位置控制 moveit_controller:MoveIt控制",
         )
     )

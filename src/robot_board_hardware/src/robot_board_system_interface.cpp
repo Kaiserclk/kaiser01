@@ -207,8 +207,8 @@ namespace robot_board_hardware
 
     // Pre-reserve to avoid rehash during insertion.
     // std::unordered_map rehash invalidates ALL pointers/references stored in CommandInterface.
-    // Count: wheels + arm_servos + 4(LED) + 4(buzzer) = N+8
-    hw_commands_.reserve((wheels_.size() + arm_servos_.size() + 8) * 2);
+    // Count: wheels + arm_servos*2(pos+duration) + 4(LED) + 4(buzzer) = N*2+8
+    hw_commands_.reserve((wheels_.size() + arm_servos_.size() * 2 + 8) * 2);
 
     // Wheel velocity commands
     for (const auto &wc : wheels_)
@@ -217,11 +217,15 @@ namespace robot_board_hardware
           wc.name, hardware_interface::HW_IF_VELOCITY, &hw_commands_[wc.name + "/" + hardware_interface::HW_IF_VELOCITY]));
     }
 
-    // Arm servo position commands
+    // Arm servo position and duration commands
     for (const auto &sc : arm_servos_)
     {
       command_interfaces.emplace_back(hardware_interface::CommandInterface(
           sc.name, hardware_interface::HW_IF_POSITION, &hw_commands_[sc.name + "/" + hardware_interface::HW_IF_POSITION]));
+      command_interfaces.emplace_back(hardware_interface::CommandInterface(
+          sc.name, "duration", &hw_commands_[sc.name + "/duration"]));
+      // Initialize default duration from URDF parameter
+      hw_commands_[sc.name + "/duration"] = static_cast<double>(sc.servo_duration);
     }
 
     // LED commands
@@ -549,12 +553,9 @@ namespace robot_board_hardware
       }
     }
 
-    // Write arm servo positions (only if torque is enabled)
+    // Write arm servo positions individually (each with its own duration)
     if (servo_torque_enabled_.load())
     {
-      std::vector<std::pair<uint8_t, uint16_t>> positions;
-      bool has_changes = false;
-
       for (size_t i = 0; i < arm_servos_.size(); ++i)
       {
         double cmd_rad = hw_commands_[arm_servos_[i].name + "/" + hardware_interface::HW_IF_POSITION];
@@ -568,20 +569,19 @@ namespace robot_board_hardware
         // Only send if changed (threshold 1 pulse)
         if (std::abs(static_cast<double>(pulse) - prev_arm_cmd_raw_[i]) > 1.0)
         {
-          has_changes = true;
           prev_arm_cmd_raw_[i] = static_cast<double>(pulse);
+
+          // Read per-servo duration from command interface, clamp to valid range [0, 2000] ms
+          double dur = hw_commands_[arm_servos_[i].name + "/duration"];
+          uint16_t duration = static_cast<uint16_t>(std::clamp(dur, 0.0, 2000.0));
+
+          std::vector<std::pair<uint8_t, uint16_t>> positions = {
+              {arm_servos_[i].servo_id, pulse}
+          };
+          auto data = PacketProtocol::build_bus_servo_position_cmd(duration, positions);
+          serial_port_->send_packet(
+              static_cast<uint8_t>(PacketFunction::BUS_SERVO), data);
         }
-
-        positions.emplace_back(arm_servos_[i].servo_id, pulse);
-      }
-
-      if (has_changes)
-      {
-        // Use first servo's duration as the movement time for all servos in this batch
-        uint16_t duration = arm_servos_.empty() ? 500 : arm_servos_[0].servo_duration;
-        auto data = PacketProtocol::build_bus_servo_position_cmd(duration, positions);
-        serial_port_->send_packet(
-            static_cast<uint8_t>(PacketFunction::BUS_SERVO), data);
       }
     }
 
