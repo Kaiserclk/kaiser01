@@ -1,0 +1,6 @@
+# Request: target joint angles in radians (one per joint)
+float64[] angles
+---
+# Response
+bool success
+string message

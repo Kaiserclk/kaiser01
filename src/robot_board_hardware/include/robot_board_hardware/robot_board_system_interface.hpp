@@ -98,10 +98,6 @@ private:
     int min_pulse = 0;      // Minimum pulse width
     int max_pulse = 1000;   // Maximum pulse width
     bool flipped = false;   // True if min_pulse > max_pulse (reversed direction)
-    uint16_t servo_duration = 500; // Movement duration in ms (0=fastest)
-
-    // Initial joint angle at startup (radians)
-    double init_rad = 0.0;
 
     // Computed joint limits in radians
     double min_rad = 0.0;

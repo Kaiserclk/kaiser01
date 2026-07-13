@@ -46,10 +46,8 @@
       <state_interface name="velocity"/>
       <param name="servo_id">1</param>
       <param name="zero">498</param>
-      <param name="init">0.0</param>
       <param name="min">1000</param>
       <param name="max">0</param>
-      <param name="servo_duration">1200</param>
     </joint>
     <joint name="arm_joint2">
       <command_interface name="position"/>
@@ -57,10 +55,8 @@
       <state_interface name="velocity"/>
       <param name="servo_id">2</param>
       <param name="zero">495</param>
-      <param name="init">-0.9</param>
       <param name="min">1000</param>
       <param name="max">0</param>
-      <param name="servo_duration">1200</param>
     </joint>
     <joint name="arm_joint3">
       <command_interface name="position"/>
@@ -68,10 +64,8 @@
       <state_interface name="velocity"/>
       <param name="servo_id">3</param>
       <param name="zero">470</param>
-      <param name="init">1.57</param>
       <param name="min">1000</param>
       <param name="max">0</param>
-      <param name="servo_duration">1200</param>
     </joint>
     <joint name="arm_joint4">
       <command_interface name="position"/>
@@ -79,10 +73,8 @@
       <state_interface name="velocity"/>
       <param name="servo_id">4</param>
       <param name="zero">511</param>
-      <param name="init">1.57</param>
       <param name="min">1000</param>
       <param name="max">0</param>
-      <param name="servo_duration">1200</param>
     </joint>
     <joint name="arm_joint5">
       <command_interface name="position"/>
@@ -90,10 +82,8 @@
       <state_interface name="velocity"/>
       <param name="servo_id">5</param>
       <param name="zero">504</param>
-      <param name="init">0.0</param>
       <param name="min">1000</param>
       <param name="max">0</param>
-      <param name="servo_duration">1200</param>
     </joint>
     <joint name="arm_joint6">
       <command_interface name="position"/>
@@ -101,10 +91,8 @@
       <state_interface name="velocity"/>
       <param name="servo_id">10</param>
       <param name="zero">591</param>
-      <param name="init">1.2</param>
       <param name="min">1000</param>
       <param name="max">0</param>
-      <param name="servo_duration">1200</param>
     </joint>
 
     <!-- IMU sensor -->

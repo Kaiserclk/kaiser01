@@ -1,7 +1,7 @@
 controller_manager:
   ros__parameters:
     arm_position_controller:
-      type: forward_command_controller/ForwardCommandController
+      type: robot_arm_controller/RobotArmController
 
     arm_controller:
       type: joint_trajectory_controller/JointTrajectoryController
@@ -9,7 +9,7 @@ controller_manager:
     hand_controller:
       type: position_controllers/GripperActionController
 
-arm_position_controller: # 机械臂关节位置控制
+arm_position_controller: # 机械臂关节位置+时间控制
   ros__parameters:
     joints:
       - arm_joint1
@@ -18,7 +18,11 @@ arm_position_controller: # 机械臂关节位置控制
       - arm_joint4
       - arm_joint5
       - arm_joint6
-    interface_name: position
+    interface_names:
+      - position
+      - duration
+    state_interfaces:
+      - position
 
 arm_controller: # 机械臂关节轨迹控制器
   ros__parameters:

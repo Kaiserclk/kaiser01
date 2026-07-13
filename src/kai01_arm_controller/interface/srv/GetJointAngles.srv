@@ -1,0 +1,3 @@
+---
+# Response: current joint angles in radians (one per joint)
+float64[] angles

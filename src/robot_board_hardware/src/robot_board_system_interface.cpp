@@ -84,9 +84,6 @@ namespace robot_board_hardware
         if (joint.parameters.count("zero")) {
           sc.zero_pulse = std::stoi(joint.parameters.at("zero"));
         }
-        if (joint.parameters.count("init")) {
-          sc.init_rad = std::stod(joint.parameters.at("init"));
-        }
         if (joint.parameters.count("min")) {
           sc.min_pulse = std::stoi(joint.parameters.at("min"));
         }
@@ -101,11 +98,6 @@ namespace robot_board_hardware
           std::swap(sc.min_pulse, sc.max_pulse);
         }
         
-        // Read servo movement duration (ms), default 500ms
-        if (joint.parameters.count("servo_duration")) {
-          sc.servo_duration = static_cast<uint16_t>(std::stoi(joint.parameters.at("servo_duration")));
-        }
-        
         // Compute joint limits in radians
         sc.min_rad = sc.pulse_to_rad(sc.min_pulse);
         sc.max_rad = sc.pulse_to_rad(sc.max_pulse);
@@ -115,10 +107,10 @@ namespace robot_board_hardware
           std::swap(sc.min_rad, sc.max_rad);
         }
         
-        RCLCPP_INFO(get_logger(), "Servo %s: id=%d, zero=%d, init=%.3f rad, range=[%d,%d], flipped=%s, duration=%dms, rad=[%.2f,%.2f]",
-            sc.name.c_str(), sc.servo_id, sc.zero_pulse, sc.init_rad,
+        RCLCPP_INFO(get_logger(), "Servo %s: id=%d, zero=%d, range=[%d,%d], flipped=%s, rad=[%.2f,%.2f]",
+            sc.name.c_str(), sc.servo_id, sc.zero_pulse,
             sc.min_pulse, sc.max_pulse, sc.flipped ? "true" : "false",
-            sc.servo_duration, sc.min_rad, sc.max_rad);
+            sc.min_rad, sc.max_rad);
         
         arm_servos_.push_back(sc);
       }
@@ -127,8 +119,8 @@ namespace robot_board_hardware
     prev_arm_cmd_raw_.resize(arm_servos_.size());
     for (size_t i = 0; i < arm_servos_.size(); ++i)
     {
-      // Initialize prev to init_rad's pulse so that the first write at init_rad is NOT sent
-      prev_arm_cmd_raw_[i] = static_cast<double>(arm_servos_[i].rad_to_pulse(arm_servos_[i].init_rad));
+      // Initialize to sentinel (-1) so first position command always triggers a send
+      prev_arm_cmd_raw_[i] = -1.0;
     }
 
     RCLCPP_INFO(
@@ -224,8 +216,6 @@ namespace robot_board_hardware
           sc.name, hardware_interface::HW_IF_POSITION, &hw_commands_[sc.name + "/" + hardware_interface::HW_IF_POSITION]));
       command_interfaces.emplace_back(hardware_interface::CommandInterface(
           sc.name, "duration", &hw_commands_[sc.name + "/duration"]));
-      // Initialize default duration from URDF parameter
-      hw_commands_[sc.name + "/duration"] = static_cast<double>(sc.servo_duration);
     }
 
     // LED commands
@@ -322,35 +312,11 @@ namespace robot_board_hardware
     prev_motor_speeds_.resize(wheels_.size(), 0.0f);
     prev_motor_speeds_initialized_ = true;
 
-    // Send init position command and sync state/command interfaces to init_rad
+    // Initialize arm servo state interfaces with zero values
+    for (const auto & sc : arm_servos_)
     {
-      std::vector<std::pair<uint8_t, uint16_t>> init_positions;
-      for (size_t i = 0; i < arm_servos_.size(); ++i)
-      {
-        uint16_t pulse = arm_servos_[i].rad_to_pulse(arm_servos_[i].init_rad);
-        init_positions.emplace_back(arm_servos_[i].servo_id, pulse);
-
-        // Sync state and command interfaces to init_rad
-        hw_states_[arm_servos_[i].name + "/" + hardware_interface::HW_IF_POSITION] = arm_servos_[i].init_rad;
-        hw_commands_[arm_servos_[i].name + "/" + hardware_interface::HW_IF_POSITION] = arm_servos_[i].init_rad;
-
-        // Initialize velocity state to 0.0
-        hw_states_[arm_servos_[i].name + "/" + hardware_interface::HW_IF_VELOCITY] = 0.0;
-
-        // Sync prev_arm_cmd_raw_ so first write() won't resend immediately
-        prev_arm_cmd_raw_[i] = static_cast<double>(pulse);
-      }
-      uint16_t duration = arm_servos_.empty() ? 500 : arm_servos_[0].servo_duration;
-      auto data = PacketProtocol::build_bus_servo_position_cmd(duration, init_positions);
-      serial_port_->send_packet(static_cast<uint8_t>(PacketFunction::BUS_SERVO), data);
-      RCLCPP_INFO(rclcpp::get_logger("RobotBoardSystemInterface"),
-          "Sent init position command (duration=%dms)", duration);
-      
-      // Wait for servos to move to init position before starting read loop
-      // This prevents read() from reading the pre-init position
-      std::this_thread::sleep_for(std::chrono::milliseconds(duration + 200));
-      RCLCPP_INFO(rclcpp::get_logger("RobotBoardSystemInterface"),
-          "Init position movement complete, starting normal operation");
+      hw_states_[sc.name + "/" + hardware_interface::HW_IF_POSITION] = 0.0;
+      hw_states_[sc.name + "/" + hardware_interface::HW_IF_VELOCITY] = 0.0;
     }
 
     // Initialize IMU with identity orientation and zero readings

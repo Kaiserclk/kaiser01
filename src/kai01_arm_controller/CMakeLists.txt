@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(forward_command_controller LANGUAGES C CXX)
+project(robot_arm_controller LANGUAGES C CXX)
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "(GNU|Clang)")
   add_compile_options(-Wall -Wextra -Wpedantic -Wconversion)
@@ -27,39 +27,34 @@ endforeach()
 rosidl_generate_interfaces(${PROJECT_NAME}_msgs
   "interface/msg/JointCommand.msg"
   "interface/msg/JointGroupCommand.msg"
+  "interface/srv/SetJointAngles.srv"
+  "interface/srv/GetJointAngles.srv"
 )
 
 generate_parameter_library(
-  forward_command_controller_parameters
-  src/forward_command_controller_parameters.yaml
-)
-generate_parameter_library(
-  multi_interface_forward_command_controller_parameters
-  src/multi_interface_forward_command_controller_parameters.yaml
+  robot_arm_controller_parameters
+  src/robot_arm_controller_parameters.yaml
 )
 
-add_library(forward_command_controller SHARED
-  src/forward_controllers_base.cpp
-  src/forward_command_controller.cpp
-  src/multi_interface_forward_command_controller.cpp
+add_library(robot_arm_controller SHARED
+  src/robot_arm_controller.cpp
 )
 rosidl_get_typesupport_target(cpp_typesupport_target ${PROJECT_NAME}_msgs "rosidl_typesupport_cpp")
-target_link_libraries(forward_command_controller PUBLIC ${cpp_typesupport_target})
-add_dependencies(forward_command_controller ${PROJECT_NAME}_msgs)
-target_compile_features(forward_command_controller PUBLIC cxx_std_17)
-target_include_directories(forward_command_controller PUBLIC
+target_link_libraries(robot_arm_controller PUBLIC ${cpp_typesupport_target})
+add_dependencies(robot_arm_controller ${PROJECT_NAME}_msgs)
+target_compile_features(robot_arm_controller PUBLIC cxx_std_17)
+target_include_directories(robot_arm_controller PUBLIC
   $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
   $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/rosidl_generator_cpp>
-  $<INSTALL_INTERFACE:include/forward_command_controller>
+  $<INSTALL_INTERFACE:include/robot_arm_controller>
 )
-target_link_libraries(forward_command_controller PUBLIC
-  forward_command_controller_parameters
-  multi_interface_forward_command_controller_parameters
+target_link_libraries(robot_arm_controller PUBLIC
+  robot_arm_controller_parameters
 )
-ament_target_dependencies(forward_command_controller PUBLIC ${THIS_PACKAGE_INCLUDE_DEPENDS})
+ament_target_dependencies(robot_arm_controller PUBLIC ${THIS_PACKAGE_INCLUDE_DEPENDS})
 # Causes the visibility macros to use dllexport rather than dllimport,
 # which is appropriate when building the dll but not consuming it.
-target_compile_definitions(forward_command_controller PRIVATE "FORWARD_COMMAND_CONTROLLER_BUILDING_DLL")
+target_compile_definitions(robot_arm_controller PRIVATE "ROBOT_ARM_CONTROLLER_BUILDING_DLL")
 pluginlib_export_plugin_description_file(controller_interface forward_command_plugin.xml)
 
 
@@ -74,14 +69,13 @@ endif()
 
 install(
   DIRECTORY include/
-  DESTINATION include/forward_command_controller
+  DESTINATION include/robot_arm_controller
 )
 install(
   TARGETS
-    forward_command_controller
-    forward_command_controller_parameters
-    multi_interface_forward_command_controller_parameters
-  EXPORT export_forward_command_controller
+    robot_arm_controller
+    robot_arm_controller_parameters
+  EXPORT export_robot_arm_controller
   RUNTIME DESTINATION bin
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
@@ -92,6 +86,6 @@ install(
   DESTINATION share/${PROJECT_NAME}
 )
 
-ament_export_targets(export_forward_command_controller HAS_LIBRARY_TARGET)
+ament_export_targets(export_robot_arm_controller HAS_LIBRARY_TARGET)
 ament_export_dependencies(${THIS_PACKAGE_INCLUDE_DEPENDS})
 ament_package()
