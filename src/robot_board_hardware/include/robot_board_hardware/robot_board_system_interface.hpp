@@ -14,6 +14,7 @@
 #include "std_srvs/srv/set_bool.hpp"
 #include "robot_board_hardware/serial_port.hpp"
 #include "robot_board_hardware/visibility_control.h"
+#include "robot_board_hardware/robot_board_hardware_parameters.hpp"
 
 namespace robot_board_hardware
 {
@@ -78,6 +79,11 @@ private:
   std::string serial_device_;
   int baud_rate_ = 1000000;
 
+  // When true, the hardware drives the arm to init_pose on activate and to
+  // deactivate_pose (then disables torque) on deactivate, so the controller
+  // does not need to own arm home/rest pose management.
+  bool enable_init_pose_ = false;
+
   // Joint configuration: wheel motor names and IDs
   struct WheelConfig
   {
@@ -102,6 +108,10 @@ private:
     // Computed joint limits in radians
     double min_rad = 0.0;
     double max_rad = 0.0;
+
+    // Poses managed by the hardware (radians), used when enable_init_pose is set
+    double init_rad = 0.0;        // pose commanded on activate
+    double deactivate_rad = 0.0;  // rest pose commanded on deactivate
 
     // Convert radians to pulse width
     uint16_t rad_to_pulse(double rad) const
@@ -152,6 +162,10 @@ private:
   void servo_torque_callback(
     const std::shared_ptr<std_srvs::srv::SetBool::Request> request,
     std::shared_ptr<std_srvs::srv::SetBool::Response> response);
+
+  // Generated parameter handling (generate_parameter_library)
+  std::shared_ptr<ParamListener> param_listener_;
+  Params params_;
 
   std::shared_ptr<rclcpp::Logger> logger_;
   rclcpp::Clock::SharedPtr clock_;

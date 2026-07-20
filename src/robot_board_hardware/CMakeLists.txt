@@ -9,11 +9,16 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(ament_cmake REQUIRED)
+find_package(generate_parameter_library REQUIRED)
 find_package(hardware_interface REQUIRED)
 find_package(pluginlib REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclcpp_lifecycle REQUIRED)
 find_package(std_srvs REQUIRED)
+
+generate_parameter_library(robot_board_hardware_parameters
+  src/robot_board_hardware_parameters.yaml
+)
 
 add_library(${PROJECT_NAME} SHARED
   src/packet_protocol.cpp
@@ -34,6 +39,8 @@ ament_target_dependencies(${PROJECT_NAME} PUBLIC
   std_srvs
 )
 
+target_link_libraries(${PROJECT_NAME} PUBLIC robot_board_hardware_parameters)
+
 pluginlib_export_plugin_description_file(hardware_interface robot_board_hardware_plugin.xml)
 
 install(
@@ -42,7 +49,7 @@ install(
 )
 
 install(
-  TARGETS ${PROJECT_NAME}
+  TARGETS ${PROJECT_NAME} robot_board_hardware_parameters
   EXPORT export_${PROJECT_NAME}
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib

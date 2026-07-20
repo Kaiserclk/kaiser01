@@ -90,7 +90,7 @@ namespace robot_board_hardware
         if (joint.parameters.count("max")) {
           sc.max_pulse = std::stoi(joint.parameters.at("max"));
         }
-        
+
         // Determine if joint is flipped (min > max)
         sc.flipped = sc.min_pulse > sc.max_pulse;
         if (sc.flipped) {
@@ -285,6 +285,45 @@ namespace robot_board_hardware
       RCLCPP_WARN(get_logger(), "Failed to create servo torque service: %s", e.what());
     }
 
+    // Load arm pose parameters via generate_parameter_library. These come from the
+    // GPL spec defaults (compiled into robot_board_hardware) and may be overridden
+    // by a params file loaded onto the "robot_board_hardware" node at launch.
+    if (custom_node_)
+    {
+      try {
+        param_listener_ = std::make_shared<ParamListener>(custom_node_);
+        params_ = param_listener_->get_params();
+        enable_init_pose_ = params_.enable_init_pose;
+
+        if (enable_init_pose_)
+        {
+          if (params_.init_arm_pose.size() != arm_servos_.size() ||
+              params_.deactivate_arm_pose.size() != arm_servos_.size())
+          {
+            RCLCPP_WARN(get_logger(),
+                "Pose size mismatch (init=%zu, deactivate=%zu, arm servos=%zu); "
+                "disabling hardware-managed arm poses",
+                params_.init_arm_pose.size(), params_.deactivate_arm_pose.size(),
+                arm_servos_.size());
+            enable_init_pose_ = false;
+          }
+          else
+          {
+            for (size_t i = 0; i < arm_servos_.size(); ++i)
+            {
+              arm_servos_[i].init_rad = params_.init_arm_pose[i];
+              arm_servos_[i].deactivate_rad = params_.deactivate_arm_pose[i];
+            }
+          }
+        }
+        RCLCPP_INFO(get_logger(), "Loaded arm pose parameters (enable_init_pose=%s)",
+            enable_init_pose_ ? "true" : "false");
+      } catch (const std::exception &e) {
+        RCLCPP_ERROR(get_logger(), "Failed to load arm pose parameters: %s", e.what());
+        return hardware_interface::CallbackReturn::ERROR;
+      }
+    }
+
     return hardware_interface::CallbackReturn::SUCCESS;
   }
 
@@ -312,11 +351,60 @@ namespace robot_board_hardware
     prev_motor_speeds_.resize(wheels_.size(), 0.0f);
     prev_motor_speeds_initialized_ = true;
 
-    // Initialize arm servo state interfaces with zero values
-    for (const auto & sc : arm_servos_)
+    // Initialize arm servo interfaces.
+    // When enable_init_pose_ is set, drive every servo to its configured init pose
+    // (the servo firmware honours the duration internally, so the send is non-blocking).
+    // Otherwise, seed command == state from the servo's ACTUAL position so the first
+    // write() cycles detect no change and the arm does not snap anywhere.
+    std::vector<std::pair<uint8_t, uint16_t>> init_positions;
+    for (size_t i = 0; i < arm_servos_.size(); ++i)
     {
-      hw_states_[sc.name + "/" + hardware_interface::HW_IF_POSITION] = 0.0;
-      hw_states_[sc.name + "/" + hardware_interface::HW_IF_VELOCITY] = 0.0;
+      const auto & sc = arm_servos_[i];
+      const std::string pos_key = sc.name + "/" + hardware_interface::HW_IF_POSITION;
+      const std::string vel_key = sc.name + "/" + hardware_interface::HW_IF_VELOCITY;
+
+      double actual_rad = 0.0;
+      auto pulse_opt = serial_port_->read_bus_servo_position(sc.servo_id);
+      if (pulse_opt.has_value())
+      {
+        actual_rad = sc.pulse_to_rad(pulse_opt.value());
+      }
+      else
+      {
+        RCLCPP_WARN(get_logger(),
+            "on_activate: failed to read servo %d position, assuming 0 rad", sc.servo_id);
+      }
+
+      // State always reflects the servo's real position.
+      hw_states_[pos_key] = actual_rad;
+      hw_states_[vel_key] = 0.0;
+      hw_commands_[sc.name + "/duration"] = 2000.0;  // safe default duration
+
+      if (enable_init_pose_)
+      {
+        // Command the configured init pose; align the change-detection cache to the
+        // init pulse so write() does not resend the command we issue below.
+        const uint16_t init_pulse = sc.rad_to_pulse(sc.init_rad);
+        hw_commands_[pos_key] = sc.init_rad;
+        prev_arm_cmd_raw_[i] = static_cast<double>(init_pulse);
+        init_positions.emplace_back(sc.servo_id, init_pulse);
+      }
+      else
+      {
+        // Seed command with the current position so no motion is commanded yet.
+        hw_commands_[pos_key] = actual_rad;
+        prev_arm_cmd_raw_[i] = static_cast<double>(sc.rad_to_pulse(actual_rad));
+      }
+    }
+
+    // Drive the arm to the initial pose in a single bus command.
+    if (enable_init_pose_ && !init_positions.empty())
+    {
+      servo_torque_enabled_.store(true);
+      auto init_data = PacketProtocol::build_bus_servo_position_cmd(2000, init_positions);
+      serial_port_->send_packet(
+          static_cast<uint8_t>(PacketFunction::BUS_SERVO), init_data);
+      RCLCPP_INFO(get_logger(), "on_activate: commanded arm to configured init pose");
     }
 
     // Initialize IMU with identity orientation and zero readings
@@ -351,6 +439,36 @@ namespace robot_board_hardware
     auto motor_data = PacketProtocol::build_motor_speed_cmd(zero_speeds);
     serial_port_->send_packet(
         static_cast<uint8_t>(PacketFunction::MOTOR), motor_data);
+
+    // When the hardware owns arm pose management, move the arm to its rest pose
+    // and then release torque. The servo firmware honours the duration, so we wait
+    // for the motion to finish before cutting torque to avoid the arm sagging.
+    if (enable_init_pose_ && !arm_servos_.empty() && serial_port_)
+    {
+      std::vector<std::pair<uint8_t, uint16_t>> deactivate_positions;
+      for (const auto & sc : arm_servos_)
+      {
+        deactivate_positions.emplace_back(sc.servo_id, sc.rad_to_pulse(sc.deactivate_rad));
+      }
+      auto pose_data = PacketProtocol::build_bus_servo_position_cmd(2000, deactivate_positions);
+      serial_port_->send_packet(
+          static_cast<uint8_t>(PacketFunction::BUS_SERVO), pose_data);
+
+      // Prevent write() from fighting the shutdown motion.
+      servo_torque_enabled_.store(false);
+
+      // Wait for the arm to reach the rest pose before releasing torque.
+      std::this_thread::sleep_for(std::chrono::milliseconds(2000));
+
+      for (const auto & sc : arm_servos_)
+      {
+        auto torque_data = PacketProtocol::build_bus_servo_enable_torque_cmd(sc.servo_id, false);
+        serial_port_->send_packet(
+            static_cast<uint8_t>(PacketFunction::BUS_SERVO), torque_data);
+        std::this_thread::sleep_for(std::chrono::milliseconds(20));
+      }
+      RCLCPP_INFO(get_logger(), "on_deactivate: arm moved to rest pose and torque disabled");
+    }
 
     RCLCPP_INFO(rclcpp::get_logger("RobotBoardSystemInterface"), "Hardware deactivated");
     return hardware_interface::CallbackReturn::SUCCESS;
@@ -444,10 +562,10 @@ namespace robot_board_hardware
         // Convert pulse to radians
         int16_t pulse = pulse_opt.value();
         double actual_rad = sc.pulse_to_rad(pulse);
+        // Only update STATE interface; NEVER write back to the command interface.
+        // The command interface is owned by the controller; overwriting it here
+        // would cancel in-progress motions (servo stops right after starting).
         hw_states_[pos_key] = actual_rad;
-        
-        // Update command to match actual position for smooth transition
-        hw_commands_[pos_key] = actual_rad;
       }
       else
       {
@@ -640,6 +758,4 @@ namespace robot_board_hardware
 
 } // namespace robot_board_hardware
 
-PLUGINLIB_EXPORT_CLASS(
-    robot_board_hardware::RobotBoardSystemInterface,
-    hardware_interface::SystemInterface)
+PLUGINLIB_EXPORT_CLASS(robot_board_hardware::RobotBoardSystemInterface,hardware_interface::SystemInterface)

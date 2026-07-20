@@ -20,10 +20,19 @@ find_package(eigen3_cmake_module REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(kdl_parser REQUIRED)
 find_package(NLopt REQUIRED)
+find_package(Python3 REQUIRED COMPONENTS Interpreter Development)
+find_package(pybind11 REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(urdf REQUIRED)
 
+# ---- Python version for install destination ----
+execute_process(
+  COMMAND ${Python3_EXECUTABLE} -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')"
+  OUTPUT_VARIABLE PYTHON_VERSION
+  OUTPUT_STRIP_TRAILING_WHITESPACE)
+
 add_library(${PROJECT_NAME} SHARED
+  src/arm_kinematics.cpp
   src/kdl_tl.cpp
   src/nlopt_ik.cpp
   src/trac_ik.cpp)
@@ -77,6 +86,38 @@ install(TARGETS ${PROJECT_NAME}
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION lib/${PROJECT_NAME})
+
+# ==========================================================================
+#  Python bindings (pybind11)
+# ==========================================================================
+
+add_library(_trac_ik MODULE
+  python/trac_ik_py/_bindings.cpp)
+
+target_include_directories(_trac_ik PRIVATE
+  ${pybind11_INCLUDE_DIRS}
+  ${Python3_INCLUDE_DIRS})
+
+target_link_libraries(_trac_ik ${PROJECT_NAME})
+
+target_compile_definitions(_trac_ik PRIVATE "TRAC_IK_BUILDING_LIBRARY")
+
+set_target_properties(_trac_ik PROPERTIES
+  CXX_STANDARD 17
+  CXX_STANDARD_REQUIRED YES
+  CXX_EXTENSIONS NO
+  PREFIX ""
+  SUFFIX ".${Python3_SOABI}${CMAKE_SHARED_MODULE_SUFFIX}"
+  BUILD_RPATH "${CMAKE_CURRENT_BINARY_DIR}"
+  INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib"
+  LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/python/trac_ik_py")
+
+# Install Python package
+install(TARGETS _trac_ik
+  DESTINATION lib/python${PYTHON_VERSION}/site-packages/trac_ik_py)
+install(DIRECTORY python/trac_ik_py/
+  DESTINATION lib/python${PYTHON_VERSION}/site-packages/trac_ik_py
+  PATTERN "*.cpp" EXCLUDE)
 
 if(BUILD_TESTING)
     find_package(ament_lint_auto REQUIRED)

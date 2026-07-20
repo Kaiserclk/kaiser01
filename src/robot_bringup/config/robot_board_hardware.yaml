@@ -1,0 +1,19 @@
+# Runtime parameters for the robot_board_hardware system interface.
+#
+# The hardware component creates an internal ROS node named "robot_board_hardware"
+# (in robot_board_system_interface.cpp on_configure). generate_parameter_library's
+# ParamListener declares these parameters on that node, so the section key below
+# MUST match the node name. This file must be passed to the ros2_control_node
+# process (see robot_control.launch.py); the internal node inherits the
+# --params-file argument from the process.
+#
+# These override the defaults compiled into robot_board_hardware. Omit this file
+# entirely to use the GPL spec defaults.
+robot_board_hardware:
+  ros__parameters:
+    # When true, the hardware drives the arm to init_arm_pose on activate and to
+    # deactivate_arm_pose (then disables torque) on deactivate.
+    enable_init_pose: true
+    # One value per arm servo, in URDF joint order (arm_joint1 .. arm_joint6), radians.
+    init_arm_pose: [0.0, -0.9, 1.57, 1.57, 0.0, 1.2]
+    deactivate_arm_pose: [0.0, -0.9, 1.57, 1.57, 0.0, 1.2]

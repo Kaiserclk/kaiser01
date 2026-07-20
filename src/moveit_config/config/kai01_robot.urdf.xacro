@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="kai01_robot">
+    <xacro:arg name="initial_positions_file" default="initial_positions.yaml" />
+
+    <!-- Import kai01_robot urdf file -->
+    <xacro:include filename="$(find kai01_description)/urdf/kai01.urdf.xacro" />
+
+    <!-- Import control_xacro -->
+    <xacro:include filename="kai01_robot.ros2_control.xacro" />
+
+
+    <xacro:kai01_robot_ros2_control name="FakeSystem" initial_positions_file="$(arg initial_positions_file)"/>
+
+</robot>

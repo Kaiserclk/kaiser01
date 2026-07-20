@@ -11,7 +11,9 @@ controller_manager:
     imu_broadcaster:
       type: imu_sensor_broadcaster/IMUSensorBroadcaster
 
-#麦轮控制器参数
+    robot_arm_controller:
+      type: robot_arm_controller/RobotArmController
+
 mecanum_drive_controller:
   ros__parameters:
     # Wheel joint names (must match URDF joint names)
@@ -63,3 +65,18 @@ joint_state_broadcaster:
     interfaces:
       - position
       - velocity
+
+robot_arm_controller:
+  ros__parameters:
+    joints:
+      - arm_joint1
+      - arm_joint2
+      - arm_joint3
+      - arm_joint4
+      - arm_joint5
+      - arm_joint6
+    interface_names:
+      - position
+      - duration
+    state_interfaces:
+      - position

@@ -1,0 +1,16 @@
+robot_board_hardware:
+  enable_init_pose: {
+    type: bool,
+    default_value: true,
+    description: "When true, the hardware drives the arm to init_arm_pose on activate and to deactivate_arm_pose (then disables torque) on deactivate",
+  }
+  init_arm_pose: {
+    type: double_array,
+    default_value: [0.0, -0.9, 1.57, 1.57, 0.0, 1.2],
+    description: "Initial pose of the arm (radians), one value per arm servo in URDF joint order",
+  }
+  deactivate_arm_pose: {
+    type: double_array,
+    default_value: [0.0, -0.9, 1.57, 1.57, 0.0, 1.2],
+    description: "Rest pose of the arm (radians), one value per arm servo in URDF joint order",
+  }

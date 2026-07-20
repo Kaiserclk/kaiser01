@@ -1,0 +1,10 @@
+moveit_setup_assistant_config:
+  urdf:
+    package: kai01_description
+    relative_path: urdf/kai01.urdf.xacro
+  srdf:
+    relative_path: config/kai01_robot.srdf
+  package_settings:
+    author_name: kaiser
+    author_email: 1942797709@qq.com
+    generated_timestamp: 1777658328

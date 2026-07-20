@@ -26,7 +26,7 @@ def generate_launch_description():
         DeclareLaunchArgument('connection_delay', default_value='100'),
         DeclareLaunchArgument('color_width', default_value='640'),
         DeclareLaunchArgument('color_height', default_value='360'),
-        DeclareLaunchArgument('color_fps', default_value='10'),
+        DeclareLaunchArgument('color_fps', default_value='30'),
         DeclareLaunchArgument('color_format', default_value='MJPG'),
         DeclareLaunchArgument('enable_color', default_value='true'),
         DeclareLaunchArgument('flip_color', default_value='false'),

@@ -86,7 +86,6 @@ std::vector<uint8_t> PacketProtocol::build_bus_servo_position_cmd(
 
 /**
  * @brief 构建读总线舵机位置命令包
- *
  * @param servo_id The ID of the servo to read.
  * @return std::vector<uint8_t> The built packet.
  */
@@ -98,23 +97,14 @@ std::vector<uint8_t> PacketProtocol::build_bus_servo_read_position_cmd(uint8_t s
 
 /**
  * @brief 构建总线舵机使能扭矩命令包
- *
  * @param servo_id The ID of the servo.
  * @param enable True to enable torque, false to disable.
  * @return std::vector<uint8_t> The built packet.
- * 
- * @note 重要：该舵机固件的力矩命令语义与常规相反！
- *       - 0x0B 实际效果是 DISABLE torque
- *       - 0x0C 实际效果是 ENABLE torque
- *       因此这里需要反转命令码
  */
 std::vector<uint8_t> PacketProtocol::build_bus_servo_enable_torque_cmd(
   uint8_t servo_id, bool enable)
 {
-  // Due to firmware bug, command codes are inverted:
-  // - 0x0B actually DISABLES torque
-  // - 0x0C actually ENABLES torque
-  // So we need to invert the command based on desired state
+  // - 0x0B actually DISABLES torque - 0x0C actually ENABLES torque
   return {static_cast<uint8_t>(enable ? 0x0C : 0x0B), servo_id};
 }
 

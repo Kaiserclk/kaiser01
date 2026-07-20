@@ -161,22 +161,6 @@ bool SerialPort::send_packet(uint8_t function, const std::vector<uint8_t> & data
 {
   auto packet = PacketProtocol::build_packet(function, data);
 
-  // Debug: hex dump for motor packets (function==3), throttled
-  // if (function == 3) {
-  //   static int motor_dump_count = 0;
-  //   if (motor_dump_count < 3) {
-  //     motor_dump_count++;
-  //     std::string hex;
-  //     hex.reserve(packet.size() * 3);
-  //     for (uint8_t b : packet) {
-  //       char buf[4];
-  //       snprintf(buf, sizeof(buf), "%02X ", b);
-  //       hex += buf;
-  //     }
-  //     RCLCPP_INFO(rclcpp::get_logger("SerialPort"),
-  //         "TX motor packet (%zu bytes): %s", packet.size(), hex.c_str());
-  //   }
-  // }
 
   std::lock_guard<std::mutex> lock(write_mutex_);
   return raw_write(packet);

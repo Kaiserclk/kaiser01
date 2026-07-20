@@ -1,0 +1,16 @@
+robot_arm_controller:
+  joints: {
+    type: string_array,
+    default_value: [],
+    description: "Name of the joints to control",
+  }
+  interface_names: {
+    type: string_array,
+    default_value: ["position", "duration"],
+    description: "Names of the interfaces to command (position and duration for servos)",
+  }
+  robot_urdf: {
+    type: string,
+    default_value: '',
+    description: "URDF file of the robot arm",
+  }
